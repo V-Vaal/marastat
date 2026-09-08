@@ -127,7 +127,7 @@ peut proposer des pistes, jamais décider.
 
 ## Ce que l'outil garantit
 
-Ces quatre propriétés sont testées, pas seulement affirmées. Le fichier
+Ces cinq propriétés sont testées, pas seulement affirmées. Le fichier
 [`tests/test_bout_en_bout.py`](tests/test_bout_en_bout.py) les vérifie sur la
 chaîne complète, des PDF au rapport.
 
@@ -150,12 +150,19 @@ produits. Une interruption laisse la campagne précédente entière et cohérent
 Il n'existe pas d'état où un rapport à jour côtoie une base périmée.
 
 **Une date invraisemblable est signalée, jamais corrigée.** Une facture datée
-du futur, ou dont l'année est séparée de plus de deux ans de toutes les autres
-(une saisie `2015` au lieu de `2025`), est conservée dans les totaux et
-signalée en console comme dans le rapport. Le contrôle est volontairement
-grossier pour ne produire aucun faux positif : il vise les fautes de frappe
-sur l'année, qui sont les plus destructrices, et n'invente jamais de
-correction.
+du futur est signalée sans condition. Une année aberrante l'est quand elle est
+à la fois isolée du reste du corpus (plus de deux ans de tout autre millésime)
+et marginale (au plus 5 % des factures). Les deux conditions ensemble, jamais
+l'une sans l'autre : une exploitation qui a des archives 2020-2022 puis reprend
+en 2026 a une année 2026 isolée de quatre ans, et signaler toutes ses factures
+courantes serait le pire des faux positifs. Un millésime qui pèse lourd décrit
+une interruption d'activité, pas une faute de frappe. La facture signalée reste
+comptée : le contrôle avertit, il ne corrige pas.
+
+Ce qu'il ne voit pas : une erreur de quelques semaines, que rien dans la
+facture ne permet de contredire, et une faute d'année sur un corpus minuscule,
+où une facture sur dix pèse déjà 10 %. Il faut une vingtaine de factures pour
+qu'une saisie erronée redescende sous le seuil et ressorte.
 
 **Un libellé de facture n'est jamais exécutable.** Les désignations viennent
 de PDF tiers. Toute cellule de l'export qui commence par `=`, `+`, `-` ou `@`
@@ -168,6 +175,14 @@ pour que la protection soit vérifiée à chaque exécution.
 **Aucune marge.** Les factures ne portent aucun prix d'achat ni coût de
 production. L'outil mesure ce qui a été vendu et facturé, pas ce qui a été
 gagné.
+
+**Les montants sont manipulés en flottants, pas en décimaux.** Le contrôle
+ligne à ligne, lui, se fait en `Decimal` avec l'arrondi commercial : c'est là
+que se joue la fidélité au document imprimé. Mais le stockage, les sommes et
+SQLite travaillent en virgule flottante, et la réconciliation tolère un écart
+de deux centimes. C'est un choix assumé pour un outil qui **mesure** des
+ventes. Ce n'en serait pas un pour produire une pièce comptable, et Marastat
+n'a pas cette prétention.
 
 **Kilos et pièces ne s'additionnent pas.** Les deux volumes restent séparés
 partout. Quand l'unité n'est pas imprimée, elle est déduite de celle observée
@@ -215,6 +230,17 @@ démonstration est fictif et produit par
 [`outils/generer_demo.py`](outils/generer_demo.py). Ce générateur est
 déterministe : deux exécutions donnent le même jeu, ce qui en fait à la fois
 une démonstration et un jeu d'essai reproductible en intégration continue.
+
+**Ce que cette démonstration prouve, et ce qu'elle ne prouve pas.** Le
+générateur a été écrit pour produire le gabarit que le parseur attend. Les 108
+factures fictives établissent donc que la chaîne est cohérente avec elle-même
+et qu'elle traite correctement les cas difficiles qu'on y a placés : elles
+n'établissent pas que le parseur lit de vraies factures. Cette preuve-là ne
+peut pas figurer dans un dépôt public, puisqu'il faudrait y publier les
+documents d'une exploitation et de ses clients. Elle existe ailleurs, sous la
+forme d'un usage mensuel en production et des 198 factures réconciliées citées
+plus haut, et il faut la prendre pour ce qu'elle est : un chiffre rapporté par
+l'auteur, invérifiable de l'extérieur.
 
 ## Organisation du code
 

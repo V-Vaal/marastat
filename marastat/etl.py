@@ -17,13 +17,14 @@ from pathlib import Path
 
 from .catalogue import (
     NON_IDENTIFIE,
+    Regle,
     candidats_produits,
     charger_clients,
     charger_produits,
     charger_regles,
     classer,
 )
-from .parser import Facture, lire_dossier, nettoyer_nombre
+from .parser import Facture, Ligne, lire_dossier, nettoyer_nombre
 
 SCHEMA = """
 DROP TABLE IF EXISTS lignes;
@@ -68,9 +69,12 @@ CREATE INDEX idx_lignes_legume ON lignes(legume);
 CREATE INDEX idx_lignes_client ON lignes(code_client);
 """
 
-# Au-dela de cet ecart en annees, une annee du corpus est consideree isolee
-# et ses factures sont signalees comme suspectes (jamais ecartees).
+# Une annee du corpus est tenue pour suspecte si elle est a la fois eloignee
+# de toutes les autres et portee par une poignee de factures seulement. Les
+# deux conditions ensemble, jamais l'une sans l'autre : voir
+# reperer_dates_invraisemblables pour le detail et le contre-exemple.
 ECART_ANNEE_ISOLEE = 2
+PART_MAX_ANNEE_ISOLEE = 0.05
 
 UNITES = {
     "kg": "kg",
@@ -120,15 +124,17 @@ class Rapport:
     lignes_non_identifiees: int
     ca_non_identifie: float
     ca_total: float
+    # Toujours renseigne par construire() : le type le dit, pour que l'appelant
+    # n'ait pas a verifier une absence qui ne se produit jamais.
+    base_temporaire: Path
     dates_suspectes: list[tuple[str, str]] = field(default_factory=list)
-    base_temporaire: Path | None = None
 
 
 def _unite_normalisee(brut: str) -> str:
     return UNITES.get(brut.strip().lower(), "inconnu")
 
 
-def classer_ligne(ligne, regles) -> tuple[str, str]:
+def classer_ligne(ligne: Ligne, regles: list[Regle]) -> tuple[str, str]:
     """Classe uniquement le texte porte par la ligne de vente elle-meme."""
     return classer(ligne.ref, ligne.libelle_propre, regles)
 
@@ -257,53 +263,63 @@ def reperer_dates_invraisemblables(
     simplement fausse reconcilie parfaitement et deplace pourtant la vente
     dans le mauvais mois, voire dans le mauvais exercice.
 
-    Deux signaux volontairement grossiers, choisis pour ne produire aucun faux
-    positif sur un corpus normal :
+    Deux signaux, et deux seulement :
 
     * une date posterieure a aujourd'hui, qui n'existe pas encore ;
-    * une annee isolee, c'est-a-dire separee de plus de deux ans de toute
-      autre annee du corpus (une saisie 2015 ou 2062 au lieu de 2025).
+    * une annee a la fois **isolee** du reste du corpus (plus de
+      ``ECART_ANNEE_ISOLEE`` ans de tout autre millesime) et **marginale**
+      (au plus ``PART_MAX_ANNEE_ISOLEE`` des factures).
 
-    Une erreur de quelques semaines reste indetectable : rien dans la facture
-    ne permet de la contredire. Ce controle vise les fautes de frappe sur
-    l'annee, qui sont les plus rares et les plus destructrices.
+    La condition de marginalite n'est pas cosmetique : sans elle, une
+    exploitation qui a des archives 2020-2022 puis reprend en 2026 verrait
+    *toutes* ses factures courantes signalees, l'annee 2026 etant isolee de
+    quatre ans. Un millesime qui porte une part significative du corpus decrit
+    une interruption d'activite, pas une faute de frappe.
+
+    Ce que le controle ne voit pas, et qu'il faut savoir :
+
+    * une erreur de quelques semaines ou de quelques mois, que rien dans la
+      facture ne permet de contredire ;
+    * une faute d'annee isolee sur un petit corpus : une seule facture parmi
+      dix pese 10 %, donc au-dela du seuil. Il faut une vingtaine de factures
+      pour qu'une saisie erronee redescende sous la barre et ressorte.
     """
     aujourd_hui = aujourd_hui or date.today()
     signalements: list[tuple[str, str]] = []
+    if not factures:
+        return signalements
 
-    annees = sorted({facture.annee for facture in factures})
-    isolees = {
-        annee
-        for position, annee in enumerate(annees)
-        if min(
-            (
-                abs(annee - voisine)
-                for rang, voisine in enumerate(annees)
-                if rang != position
-            ),
-            default=0,
-        )
-        > ECART_ANNEE_ISOLEE
-    }
+    comptes = Counter(facture.annee for facture in factures)
+    annees = sorted(comptes)
+
+    def isolee(annee: int) -> bool:
+        voisines = [abs(annee - autre) for autre in annees if autre != annee]
+        return bool(voisines) and min(voisines) > ECART_ANNEE_ISOLEE
+
+    def marginale(annee: int) -> bool:
+        return comptes[annee] / len(factures) <= PART_MAX_ANNEE_ISOLEE
+
+    suspectes = {an for an in annees if isolee(an) and marginale(an)}
 
     for facture in factures:
         if facture.date > aujourd_hui.isoformat():
             signalements.append(
                 (facture.fichier, f"date dans le futur ({facture.date})")
             )
-        elif facture.annee in isolees:
+        elif facture.annee in suspectes:
             signalements.append(
                 (
                     facture.fichier,
-                    f"annee {facture.annee} isolee du reste des factures "
-                    f"({annees[0]} a {annees[-1]}) : date a verifier",
+                    f"annee {facture.annee} isolee et marginale "
+                    f"({comptes[facture.annee]} facture(s) sur {len(factures)}, "
+                    f"corpus {annees[0]} a {annees[-1]}) : date a verifier",
                 )
             )
     return signalements
 
 
 def unites_reference(
-    factures: list[Facture], regles
+    factures: list[Facture], regles: list[Regle]
 ) -> dict[str, str]:
     """Unite unique observee par legume, hors lignes non identifiees."""
     unites_vues: dict[str, Counter] = defaultdict(Counter)
@@ -468,12 +484,16 @@ def construire(
         lignes_non_identifiees=nb_non_id,
         ca_non_identifie=round(ca_non_id, 2),
         ca_total=round(ca_total, 2),
-        dates_suspectes=suspectes,
         base_temporaire=base_temporaire,
+        dates_suspectes=suspectes,
     )
 
 
-def _ecrire_arbitrage(chemin: Path, a_arbitrer, produits) -> None:
+def _ecrire_arbitrage(
+    chemin: Path,
+    a_arbitrer: dict[str, dict],
+    produits: list[dict[str, str]],
+) -> None:
     """Reecrit le fichier d'arbitrage en conservant les decisions deja prises."""
     lignes_existantes = [champs for _, champs in _lignes_arbitrage(chemin)]
     deja = set()

@@ -111,46 +111,73 @@ def _facture_datee(fichier: str, jour_iso: str, numero: str) -> Facture:
 AUJOURD_HUI = date(2026, 9, 8)
 
 
+def _corpus(*jours_iso: str) -> list[Facture]:
+    return [
+        _facture_datee(f"f{rang}.pdf", jour, f"F-{rang}")
+        for rang, jour in enumerate(jours_iso)
+    ]
+
+
 def test_un_corpus_normal_ne_declenche_aucun_signalement() -> None:
     """Le risque d'une heuristique, c'est le faux positif : il n'y en a pas."""
-    corpus = [
-        _facture_datee("a.pdf", "2024-01-31", "F-2024-1"),
-        _facture_datee("b.pdf", "2025-06-30", "F-2025-1"),
-        _facture_datee("c.pdf", "2026-09-01", "F-2026-1"),
-    ]
+    corpus = _corpus("2024-01-31", "2025-06-30", "2026-09-01")
     assert reperer_dates_invraisemblables(corpus, AUJOURD_HUI) == []
 
 
-def test_une_annee_isolee_est_signalee_sans_ecarter_la_facture() -> None:
-    corpus = [
-        _facture_datee("vieille.pdf", "2015-04-30", "F-2015-1"),
-        _facture_datee("b.pdf", "2025-06-30", "F-2025-1"),
-        _facture_datee("c.pdf", "2026-01-31", "F-2026-1"),
-    ]
+def test_une_annee_isolee_mais_marginale_est_signalee() -> None:
+    """Une saisie 2015 noyee dans un corpus 2026 : c'est une faute de frappe."""
+    corpus = _corpus(*(["2026-06-30"] * 30), "2015-04-30")
     signalements = reperer_dates_invraisemblables(corpus, AUJOURD_HUI)
-    assert [fichier for fichier, _ in signalements] == ["vieille.pdf"]
+    assert [fichier for fichier, _ in signalements] == ["f30.pdf"]
     assert "2015" in signalements[0][1]
 
 
-def test_une_date_dans_le_futur_est_signalee() -> None:
-    corpus = [
-        _facture_datee("a.pdf", "2026-01-31", "F-2026-1"),
-        _facture_datee("demain.pdf", "2026-09-09", "F-2026-2"),
-    ]
+def test_une_reprise_d_activite_apres_des_archives_n_est_pas_signalee() -> None:
+    """Le contre-exemple qui a motive la condition de marginalite.
+
+    Archives 2020-2022, puis reprise en 2026 : l'annee 2026 est isolee de
+    quatre ans, mais elle porte 40 % des factures. C'est une interruption
+    d'activite, pas une erreur de saisie, et signaler toutes les factures
+    courantes serait le pire des faux positifs.
+    """
+    corpus = _corpus(
+        "2020-06-30", "2021-06-30", "2022-06-30", "2026-06-30", "2026-07-31"
+    )
+    assert reperer_dates_invraisemblables(corpus, AUJOURD_HUI) == []
+
+
+def test_deux_annees_lointaines_a_poids_egal_ne_sont_pas_signalees() -> None:
+    corpus = _corpus("2023-06-30", "2026-06-30")
+    assert reperer_dates_invraisemblables(corpus, AUJOURD_HUI) == []
+
+
+def test_un_corpus_trop_petit_reste_silencieux_et_c_est_documente() -> None:
+    """Limite assumee : une facture sur dix pese 10 %, au-dela du seuil.
+
+    Le controle ne peut rien dire d'utile sur un corpus minuscule. Mieux vaut
+    qu'il se taise que de signaler une facture sur deux.
+    """
+    corpus = _corpus(*(["2026-06-30"] * 9), "2015-04-30")
+    assert reperer_dates_invraisemblables(corpus, AUJOURD_HUI) == []
+
+
+def test_un_corpus_vide_ne_leve_rien() -> None:
+    assert reperer_dates_invraisemblables([], AUJOURD_HUI) == []
+
+
+def test_une_date_dans_le_futur_est_signalee_quel_que_soit_son_poids() -> None:
+    """Une date qui n'existe pas encore ne depend d'aucun seuil."""
+    corpus = _corpus("2026-01-31", "2026-09-09")
     signalements = reperer_dates_invraisemblables(corpus, AUJOURD_HUI)
-    assert [fichier for fichier, _ in signalements] == ["demain.pdf"]
+    assert [fichier for fichier, _ in signalements] == ["f1.pdf"]
     assert "futur" in signalements[0][1]
 
 
 def test_une_annee_de_transition_n_est_pas_isolee() -> None:
-    """Deux annees consecutives, ou meme a deux ans d'ecart, restent normales."""
-    corpus = [
-        _facture_datee("a.pdf", "2024-01-31", "F-2024-1"),
-        _facture_datee("b.pdf", "2026-01-31", "F-2026-1"),
-    ]
+    """Deux annees a deux ans d'ecart restent dans le voisinage admis."""
+    corpus = _corpus("2024-01-31", "2026-01-31")
     assert reperer_dates_invraisemblables(corpus, AUJOURD_HUI) == []
 
 
 def test_une_seule_annee_ne_peut_pas_etre_isolee() -> None:
-    corpus = [_facture_datee("a.pdf", "2026-01-31", "F-2026-1")]
-    assert reperer_dates_invraisemblables(corpus, AUJOURD_HUI) == []
+    assert reperer_dates_invraisemblables(_corpus("2026-01-31"), AUJOURD_HUI) == []

@@ -27,8 +27,11 @@ jobs:
       - name: Lint
         run: python -m ruff check marastat tests outils
 
+      - name: Types
+        run: python -m mypy
+
       - name: Tests
-        run: python -m pytest -q
+        run: python -m pytest -q --cov
 
       # Le test de bout en bout couvre déjà la chaîne, mais l'exécuter en
       # ligne de commande vérifie aussi le point d'entrée et les options,

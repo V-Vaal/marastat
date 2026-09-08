@@ -31,6 +31,7 @@ def _lire_csv_logiciel(
 ) -> list[dict[str, str]]:
     """Lit un export et refuse un decodage syntaxiquement trompeur."""
     donnees = chemin.read_bytes()
+    encodages: tuple[str, ...]
     if donnees.startswith((b"\xff\xfe", b"\xfe\xff")):
         encodages = ("utf-16",)
     elif donnees.startswith(b"\xef\xbb\xbf"):

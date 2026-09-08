@@ -31,6 +31,8 @@ RAPPORT_PUBLIE = RACINE / "exemples" / "rapport-demo.html"
 DEPENDANCES = {
     "pdfplumber": "lire les factures",
     "pytest": "lancer la suite de tests",
+    "pytest_cov": "mesurer la couverture",
+    "mypy": "verifier les types",
     "ruff": "passer le lint",
     "reportlab": "fabriquer le jeu de demonstration",
 }
@@ -154,7 +156,8 @@ def main(argv: list[str] | None = None) -> int:
 
     for titre, commande in (
         ("Lint", [python, "-m", "ruff", "check", "marastat", "tests", "outils"]),
-        ("Tests", [python, "-m", "pytest", "-q"]),
+        ("Types", [python, "-m", "mypy"]),
+        ("Tests et couverture", [python, "-m", "pytest", "-q", "--cov"]),
     ):
         resultats.append((titre, etape(titre, commande)))
 

@@ -24,7 +24,7 @@ MOIS_FR = [
 ]
 
 
-def _lignes(cx, requete: str) -> list[dict]:
+def _lignes(cx: sqlite3.Connection, requete: str) -> list[dict]:
     cur = cx.execute(requete)
     colonnes = [c[0] for c in cur.description]
     return [dict(zip(colonnes, r, strict=True)) for r in cur.fetchall()]

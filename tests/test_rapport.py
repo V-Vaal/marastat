@@ -11,8 +11,11 @@ from marastat.etl import SCHEMA, Rapport
 from marastat.rapport import GABARIT, agreger
 
 
-def _bilan() -> Rapport:
+def _bilan(base_temporaire: Path | None = None) -> Rapport:
+    # base_temporaire est desormais obligatoire : c'est le chemin que la CLI
+    # publiera. Les tests d'agregation ne publient rien, un chemin fictif suffit.
     return Rapport(
+        base_temporaire=base_temporaire or Path(".ventes.sqlite.tmp"),
         fichiers_vus=2, factures_lues=2, factures_integrees=2,
         factures_rejetees=[], doublons=[], conflits=[], erreurs_lecture=[],
         erreurs_arbitrage=[], lignes=2, lignes_arbitrees=0,

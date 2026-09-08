@@ -19,7 +19,7 @@ import webbrowser
 from contextlib import closing, suppress
 from pathlib import Path
 
-from .etl import construire
+from .etl import Rapport, construire
 from .rapport import ecrire
 
 LARGEUR_BARRE = 28
@@ -31,7 +31,7 @@ LARGEUR_BARRE = 28
 AMORCES_FORMULE = ("=", "+", "-", "@", "\t", "\r")
 
 
-def neutraliser_formule(valeur):
+def neutraliser_formule(valeur: object) -> object:
     """Prefixe d'une apostrophe toute chaine qu'un tableur executerait.
 
     Les nombres ne sont jamais touches : ils sont ecrits par sqlite comme des
@@ -56,7 +56,7 @@ def afficher_progression(position: int, total: int) -> None:
         print()
 
 
-def message_fin(contexte, ouverture_prevue: bool = True) -> str:
+def message_fin(contexte: Rapport, ouverture_prevue: bool = True) -> str:
     conclusion = (
         "Cliquez sur OK pour ouvrir le rapport."
         if ouverture_prevue
@@ -70,12 +70,29 @@ def message_fin(contexte, ouverture_prevue: bool = True) -> str:
     )
 
 
-def notifier_fin(contexte, ouverture_prevue: bool = True) -> None:
+def sous_windows() -> bool:
+    """Isole le test de plateforme derriere une fonction.
+
+    Comparer ``sys.platform`` directement fait deduire au verificateur de types
+    que tout le corps de ``notifier_fin`` est mort quand il analyse sous Linux,
+    et l'inverse sous Windows : impossible de satisfaire les deux a la fois
+    avec une annotation locale. Le passer par un appel supprime la deduction
+    sans rien changer au comportement.
+    """
+    return sys.platform == "win32"
+
+
+def notifier_fin(contexte: Rapport, ouverture_prevue: bool = True) -> None:
     """Affiche une confirmation Windows sans ajouter de dépendance externe."""
-    if sys.platform != "win32":
+    if not sous_windows():
         return
     try:
-        utilisateur = ctypes.WinDLL("user32", use_last_error=True)
+        # getattr plutot que ctypes.WinDLL : l'attribut n'existe que sous
+        # Windows, et l'ecrire en dur fait echouer le verificateur de types
+        # partout ailleurs. Un ignore local, lui, deviendrait inutilise sous
+        # Windows, ou la CI passe aussi.
+        charger_dll = getattr(ctypes, "WinDLL")  # noqa: B009
+        utilisateur = charger_dll("user32", use_last_error=True)
         utilisateur.MessageBoxW(
             None,
             message_fin(contexte, ouverture_prevue),
@@ -155,71 +172,77 @@ def nettoyer(temporaires: list[Path]) -> None:
             chemin.unlink(missing_ok=True)
 
 
-def main(argv: list[str] | None = None) -> int:
+def analyser(argv: list[str] | None) -> argparse.Namespace:
+    """Options de la ligne de commande, avec des defauts qui evitent d'en taper."""
     racine = _racine_par_defaut()
-    p = argparse.ArgumentParser(
+    analyseur = argparse.ArgumentParser(
         prog="marastat",
         description="Analyse des ventes de legumes a partir des factures PDF.",
     )
-    p.add_argument("--factures", type=Path, default=racine / "Factures",
-                   help="dossier contenant les PDF (defaut : ./Factures)")
-    p.add_argument(
+    analyseur.add_argument(
+        "--factures", type=Path, default=racine / "Factures",
+        help="dossier contenant les PDF (defaut : ./Factures)",
+    )
+    analyseur.add_argument(
         "--clients", type=Path,
         help="ancien catalogue clients facultatif (les noms sont lus dans les PDF)",
     )
-    p.add_argument(
+    analyseur.add_argument(
         "--produits", type=Path,
         help="catalogue produits facultatif (pistes d'arbitrage uniquement)",
     )
-    p.add_argument("--sortie", type=Path, default=racine / "Rapport",
-                   help="dossier ou ecrire le rapport (defaut : ./Rapport)")
-    p.add_argument("--sans-ouverture", action="store_true",
-                   help="ne pas ouvrir le rapport dans le navigateur")
-    p.add_argument("--sans-notification", action="store_true",
-                   help="ne pas afficher la confirmation Windows de fin")
-    args = p.parse_args(argv)
+    analyseur.add_argument(
+        "--sortie", type=Path, default=racine / "Rapport",
+        help="dossier ou ecrire le rapport (defaut : ./Rapport)",
+    )
+    analyseur.add_argument(
+        "--sans-ouverture", action="store_true",
+        help="ne pas ouvrir le rapport dans le navigateur",
+    )
+    analyseur.add_argument(
+        "--sans-notification", action="store_true",
+        help="ne pas afficher la confirmation Windows de fin",
+    )
+    return analyseur.parse_args(argv)
 
-    for chemin, quoi in ((args.factures, "dossier des factures"),):
-        if not chemin.exists():
-            print(f"Introuvable : {quoi} ({chemin})")
-            print("Placer l'outil a cote du dossier Factures, ou utiliser --factures.")
-            return 2
 
-    for chemin, quoi in ((args.clients, "Clients.csv"),
-                         (args.produits, "Produits.csv")):
+def verifier_chemins(args: argparse.Namespace) -> bool:
+    """Dit ce qui manque, en clair, avant d'avoir lu le moindre PDF."""
+    if not args.factures.exists():
+        print(f"Introuvable : dossier des factures ({args.factures})")
+        print("Placer l'outil a cote du dossier Factures, ou utiliser --factures.")
+        return False
+    for chemin, quoi in ((args.clients, "Clients.csv"), (args.produits, "Produits.csv")):
         if chemin is not None and not chemin.is_file():
             print(f"Introuvable : fichier facultatif {quoi} ({chemin})")
-            return 2
+            return False
+    return True
 
-    args.sortie.mkdir(parents=True, exist_ok=True)
-    base = args.sortie / "ventes.sqlite"
-    arbitrage = args.sortie / "arbitrage.csv"
 
-    print("Lecture des factures...")
-    contexte = construire(
-        args.factures,
-        args.clients,
-        args.produits,
-        base,
-        arbitrage,
-        progression=afficher_progression,
-    )
+def raconter(contexte: Rapport, arbitrage: Path) -> None:
+    """Restitue ce que la lecture a trouve, et surtout ce qu'elle a ecarte.
 
+    Chaque categorie porte un prefixe fixe pour rester lisible dans une
+    console : c'est le seul retour dont dispose un utilisateur qui lance
+    l'executable d'un double-clic.
+    """
     print(f"  {contexte.fichiers_vus} fichiers vus, "
           f"{contexte.factures_lues} factures lues, "
           f"{contexte.factures_integrees} integrees, {contexte.lignes} lignes.")
-    for fichier, motif in contexte.erreurs_lecture:
-        print(f"  ILLISIBLE : {fichier} ({motif})")
-    for fichier, motif in contexte.factures_rejetees:
-        print(f"  ECARTEE   : {fichier} ({motif})")
-    for fichier, motif in contexte.doublons:
-        print(f"  DOUBLON   : {fichier} ({motif})")
-    for fichier, motif in contexte.conflits:
-        print(f"  CONFLIT   : {fichier} ({motif})")
-    for fichier, motif in contexte.dates_suspectes:
-        print(f"  DATE ?    : {fichier} ({motif})")
+
+    signalements: list[tuple[str, list[tuple[object, str]]]] = [
+        ("ILLISIBLE", list(contexte.erreurs_lecture)),
+        ("ECARTEE  ", list(contexte.factures_rejetees)),
+        ("DOUBLON  ", list(contexte.doublons)),
+        ("CONFLIT  ", list(contexte.conflits)),
+        ("DATE ?   ", list(contexte.dates_suspectes)),
+    ]
+    for prefixe, lignes in signalements:
+        for quoi, motif in lignes:
+            print(f"  {prefixe} : {quoi} ({motif})")
     for numero, motif in contexte.erreurs_arbitrage:
         print(f"  ARBITRAGE : ligne {numero} ignoree ({motif})")
+
     if contexte.lignes_non_identifiees:
         part = (
             contexte.ca_non_identifie / contexte.ca_total * 100
@@ -230,18 +253,26 @@ def main(argv: list[str] | None = None) -> int:
               f"({contexte.ca_non_identifie:.2f} EUR, {part:.1f} % du CA), "
               f"conservees comme 'Non identifie' (detail facultatif : {arbitrage.name})")
 
-    # Le rapport et l'export sont calcules depuis la base temporaire, puis les
-    # trois fichiers sont mis en place ensemble. Une interruption avant cette
-    # ligne laisse la campagne precedente entiere et coherente.
-    page = args.sortie / "rapport.html"
-    export = args.sortie / "ventes.csv"
+
+def produire_et_publier(contexte: Rapport, sortie: Path) -> tuple[Path, Path, Path]:
+    """Calcule le rapport et l'export, puis met les trois fichiers en place.
+
+    Tout est ecrit en temporaire d'abord. Une interruption laisse donc la
+    campagne precedente entiere et coherente, plutot qu'un rapport a jour a
+    cote d'une base perimee.
+    """
+    base = sortie / "ventes.sqlite"
+    page = sortie / "rapport.html"
+    export = sortie / "ventes.csv"
     base_temporaire = contexte.base_temporaire
+
     try:
         page_temporaire = ecrire(base_temporaire, contexte, page, publier=False)
         export_temporaire = exporter_csv(base_temporaire, export, publier=False)
     except Exception:
         nettoyer([base_temporaire])
         raise
+
     publier(
         [
             (page_temporaire, page),
@@ -249,10 +280,33 @@ def main(argv: list[str] | None = None) -> int:
             (base_temporaire, base),
         ]
     )
+    return page, base, export
 
+
+def main(argv: list[str] | None = None) -> int:
+    args = analyser(argv)
+    if not verifier_chemins(args):
+        return 2
+
+    args.sortie.mkdir(parents=True, exist_ok=True)
+    arbitrage = args.sortie / "arbitrage.csv"
+
+    print("Lecture des factures...")
+    contexte = construire(
+        args.factures,
+        args.clients,
+        args.produits,
+        args.sortie / "ventes.sqlite",
+        arbitrage,
+        progression=afficher_progression,
+    )
+    raconter(contexte, arbitrage)
+
+    page, base, export = produire_et_publier(contexte, args.sortie)
     print(f"\nRapport   : {page}")
     print(f"Base      : {base}")
     print(f"Export    : {export}")
+
     if not args.sans_notification:
         notifier_fin(contexte, ouverture_prevue=not args.sans_ouverture)
     if not args.sans_ouverture:

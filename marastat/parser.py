@@ -231,7 +231,9 @@ def _bornes_colonnes(mots_entete: list[dict]) -> dict[str, tuple[float, float]] 
     return bornes
 
 
-def _cellules(ligne: list[dict], bornes) -> dict[str, str]:
+def _cellules(
+    ligne: list[dict], bornes: dict[str, tuple[float, float]]
+) -> dict[str, str]:
     """Repartit les caracteres d'une ligne dans les colonnes."""
     tampon: dict[str, list[str]] = {nom: [] for nom in bornes}
     for car in ligne:
