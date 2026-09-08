@@ -38,6 +38,9 @@
   --good:#0ca30c; --bad:#e66767;
 }
 *{box-sizing:border-box}
+/* Gabarit ouvert directement : on montre le message, pas un rapport vide. */
+#gabarit-brut{margin:0;padding:18px 20px;font-size:15px;line-height:1.5}
+body[data-gabarit] > *:not(#gabarit-brut){display:none}
 body{margin:0;background:var(--plane);color:var(--ink);
   font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
   -webkit-text-size-adjust:100%}
@@ -94,6 +97,7 @@ footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
 </style>
 </head>
 <body>
+<p id="gabarit-brut" hidden>Ce fichier est le <b>gabarit</b> du rapport, pas un rapport. Les données n'y sont pas encore injectées : lancez l'outil pour produire un <code>rapport.html</code> exploitable.</p>
 <div class="wrap">
 <header>
   <h1>Rapport de ventes</h1>
@@ -173,7 +177,17 @@ footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
 <script id="donnees" type="application/json">/*__DONNEES__*/</script>
 <script>
 "use strict";
-const D = JSON.parse(document.getElementById("donnees").textContent);
+// Ouvert tel quel, ce fichier porte encore le marqueur de substitution a la
+// place des donnees. On le dit au lecteur plutot que de casser en console.
+const SOURCE = document.getElementById("donnees").textContent;
+const EST_GABARIT = !SOURCE.trim().startsWith("{");
+if (EST_GABARIT) {
+  document.body.dataset.gabarit = "1";
+  document.getElementById("gabarit-brut").hidden = false;
+}
+const D = EST_GABARIT
+  ? {meta:{mois_courts:[],mois_longs:[],annees:[],incompletes:[]}}
+  : JSON.parse(SOURCE);
 const MOIS = D.meta.mois_courts;
 const MOIS_LONGS = D.meta.mois_longs;
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -644,7 +658,7 @@ function init(){
 let minuteur;
 addEventListener("resize",()=>{clearTimeout(minuteur);minuteur=setTimeout(tout,180);});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",tout);
-init();
+if (!EST_GABARIT) init();
 </script>
 </body>
 </html>

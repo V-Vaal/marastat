@@ -45,3 +45,18 @@ def test_clients_de_meme_nom_restent_separes_et_ancienne_annee_non_marquee(
 
 def test_gabarit_n_injecte_plus_les_donnees_par_inner_html() -> None:
     assert "innerHTML" not in GABARIT.read_text(encoding="utf-8")
+
+
+def test_le_gabarit_seul_ne_casse_pas_a_l_ouverture() -> None:
+    """Ouvert tel quel, le gabarit doit s'expliquer, pas planter.
+
+    Le marqueur de substitution n'est pas du JSON : sans garde-fou, ouvrir
+    gabarit.html dans un navigateur produit une erreur console et une page
+    vide. On verifie que le garde-fou est bien la et qu'il precede la lecture
+    des donnees.
+    """
+    source = GABARIT.read_text(encoding="utf-8")
+    assert "/*__DONNEES__*/" in source
+    assert 'const EST_GABARIT = !SOURCE.trim().startsWith("{");' in source
+    assert "if (!EST_GABARIT) init();" in source
+    assert source.index("EST_GABARIT") < source.index("const D =")
