@@ -101,3 +101,72 @@ def test_nettoyer_supprime_les_temporaires_sans_echouer_sur_un_absent(
     present.write_text("x", encoding="utf-8")
     nettoyer([present, tmp_path / ".jamais-cree.tmp"])
     assert not present.exists()
+
+
+def _suivre_les_connexions(monkeypatch) -> list:
+    """Retient toutes les connexions sqlite ouvertes pendant le test."""
+    ouvertes = []
+    vrai_connect = sqlite3.connect
+
+    def connect_suivi(*args, **kwargs):
+        cx = vrai_connect(*args, **kwargs)
+        ouvertes.append(cx)
+        return cx
+
+    monkeypatch.setattr(sqlite3, "connect", connect_suivi)
+    return ouvertes
+
+
+def _est_fermee(cx) -> bool:
+    try:
+        cx.execute("SELECT 1")
+    except sqlite3.ProgrammingError:
+        return True
+    return False
+
+
+def _base_minimale(chemin) -> None:
+    with sqlite3.connect(chemin) as cx:
+        cx.executescript(SCHEMA)
+        cx.execute(
+            "INSERT INTO factures VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("F-1", "f.pdf", "2026-01-31", 2026, 1, "1", "Client", 10, 10, 1),
+        )
+        cx.execute(
+            "INSERT INTO lignes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (1, "F-1", "2026-01-31", 2026, 1, "1", "Client", "", "Tomate",
+             "Tomate", "Tomate", "regle", "kg", "facture", 1, 10, 10, None),
+        )
+
+
+def test_l_export_ne_laisse_aucune_connexion_ouverte(tmp_path, monkeypatch) -> None:
+    """Un sqlite3.Connection utilisé comme gestionnaire de contexte valide la
+    transaction mais ne ferme pas la connexion. Le fichier restait donc ouvert,
+    et Windows refuse de renommer un fichier ouvert : la publication de la base
+    échouait là-bas alors que tout passait sous Linux.
+    """
+    base = tmp_path / "ventes.sqlite"
+    _base_minimale(base)
+    ouvertes = _suivre_les_connexions(monkeypatch)
+
+    exporter_csv(base, tmp_path / "ventes.csv", publier=False)
+
+    assert ouvertes, "le suivi n'a capté aucune connexion : test inopérant"
+    assert all(_est_fermee(cx) for cx in ouvertes)
+
+
+def test_la_base_temporaire_est_renommable_apres_export(tmp_path) -> None:
+    """Le scénario exact de la publication : lire la base temporaire, puis la
+    mettre en place. Sous Windows, cela échoue si une connexion traîne.
+    """
+    base_temporaire = tmp_path / ".ventes.sqlite.tmp"
+    _base_minimale(base_temporaire)
+    export_temporaire = exporter_csv(
+        base_temporaire, tmp_path / "ventes.csv", publier=False
+    )
+    publier([
+        (export_temporaire, tmp_path / "ventes.csv"),
+        (base_temporaire, tmp_path / "ventes.sqlite"),
+    ])
+    assert (tmp_path / "ventes.sqlite").is_file()
+    assert not base_temporaire.exists()

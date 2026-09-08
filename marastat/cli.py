@@ -16,6 +16,7 @@ import ctypes
 import sqlite3
 import sys
 import webbrowser
+from contextlib import closing, suppress
 from pathlib import Path
 
 from .etl import construire
@@ -109,7 +110,11 @@ def exporter_csv(base: Path, destination: Path, publier: bool = True) -> Path:
     fichier temporaire sinon (voir ``publier`` plus bas).
     """
     temporaire = destination.with_name(f".{destination.name}.tmp")
-    with sqlite3.connect(base) as cx:
+    # closing() et non le seul "with" : un sqlite3.Connection utilise comme
+    # gestionnaire de contexte valide la transaction mais NE FERME PAS la
+    # connexion. Le fichier restait donc ouvert, et Windows refuse de renommer
+    # un fichier ouvert : la publication de la base echouait la-bas.
+    with closing(sqlite3.connect(base)) as cx:
         cur = cx.execute("""
             SELECT date, annee, mois, facture, client, famille, legume, classement,
                    unite, quantite, pu_ht, total_ht, ref, libelle
@@ -139,9 +144,15 @@ def publier(couples: list[tuple[Path, Path]]) -> None:
 
 
 def nettoyer(temporaires: list[Path]) -> None:
-    """Retire les fichiers temporaires d'une reconstruction interrompue."""
+    """Retire les fichiers temporaires d'une reconstruction interrompue.
+
+    Le nettoyage est accessoire : il ne doit jamais masquer l'erreur qui l'a
+    declenche. Sous Windows, supprimer un fichier encore ouvert echoue, et ce
+    second echec ferait disparaitre le premier.
+    """
     for chemin in temporaires:
-        chemin.unlink(missing_ok=True)
+        with suppress(OSError):
+            chemin.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:

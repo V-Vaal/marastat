@@ -4,6 +4,8 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from marastat.etl import SCHEMA, Rapport
 from marastat.rapport import GABARIT, agreger
 
@@ -60,3 +62,29 @@ def test_le_gabarit_seul_ne_casse_pas_a_l_ouverture() -> None:
     assert 'const EST_GABARIT = !SOURCE.trim().startsWith("{");' in source
     assert "if (!EST_GABARIT) init();" in source
     assert source.index("EST_GABARIT") < source.index("const D =")
+
+
+def test_agreger_ne_laisse_aucune_connexion_ouverte(tmp_path, monkeypatch) -> None:
+    """La base lue par agreger() est souvent le fichier temporaire que
+    l'appelant s'apprête à renommer : la connexion doit être refermée.
+    """
+    base = tmp_path / "ventes.sqlite"
+    with sqlite3.connect(base) as cx:
+        cx.executescript(SCHEMA)
+        _ajouter(cx, "F-2026-1", 2026, 1, "1", "Client")
+
+    ouvertes = []
+    vrai_connect = sqlite3.connect
+
+    def connect_suivi(*args, **kwargs):
+        cx = vrai_connect(*args, **kwargs)
+        ouvertes.append(cx)
+        return cx
+
+    monkeypatch.setattr(sqlite3, "connect", connect_suivi)
+    agreger(base, _bilan(), date(2026, 9, 8))
+
+    assert ouvertes, "le suivi n'a capté aucune connexion : test inopérant"
+    for cx in ouvertes:
+        with pytest.raises(sqlite3.ProgrammingError):
+            cx.execute("SELECT 1")

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
 
@@ -33,48 +34,50 @@ def agreger(
     base: str | Path, controle: Rapport, aujourd_hui: date | None = None
 ) -> dict:
     aujourd_hui = aujourd_hui or datetime.now().astimezone().date()
-    cx = sqlite3.connect(base)
+    # closing() ferme reellement la connexion : la base peut etre un
+    # fichier temporaire que l'appelant s'apprete a renommer.
+    with closing(sqlite3.connect(base)) as cx:
+        annees = [
+            r[0]
+            for r in cx.execute("SELECT DISTINCT annee FROM lignes ORDER BY annee")
+        ]
 
-    annees = [
-        r[0]
-        for r in cx.execute("SELECT DISTINCT annee FROM lignes ORDER BY annee")
-    ]
+        legumes = _lignes(cx, """
+            SELECT annee, mois, famille, legume,
+                   ROUND(SUM(total_ht), 2) AS ht,
+                   ROUND(SUM(CASE WHEN unite='kg'    THEN quantite ELSE 0 END), 1) AS kg,
+                   ROUND(SUM(CASE WHEN unite='piece' THEN quantite ELSE 0 END))     AS p
+            FROM lignes GROUP BY annee, mois, famille, legume
+        """)
 
-    legumes = _lignes(cx, """
-        SELECT annee, mois, famille, legume,
-               ROUND(SUM(total_ht), 2) AS ht,
-               ROUND(SUM(CASE WHEN unite='kg'    THEN quantite ELSE 0 END), 1) AS kg,
-               ROUND(SUM(CASE WHEN unite='piece' THEN quantite ELSE 0 END))     AS p
-        FROM lignes GROUP BY annee, mois, famille, legume
-    """)
+        mensuel = _lignes(cx, """
+            SELECT annee, mois, ROUND(SUM(total_ht), 2) AS ht
+            FROM lignes GROUP BY annee, mois ORDER BY annee, mois
+        """)
 
-    mensuel = _lignes(cx, """
-        SELECT annee, mois, ROUND(SUM(total_ht), 2) AS ht
-        FROM lignes GROUP BY annee, mois ORDER BY annee, mois
-    """)
+        # Le mois est conserve : sans lui, impossible de comparer une annee en
+        # cours a la meme periode de l'annee precedente.
+        clients = _lignes(cx, """
+            SELECT annee, mois, code_client, client,
+                   ROUND(SUM(total_ht), 2) AS ht,
+                   COUNT(DISTINCT facture) AS factures
+            FROM lignes GROUP BY annee, mois, code_client, client
+        """)
 
-    # Le mois est conserve : sans lui, impossible de comparer une annee en
-    # cours a la meme periode de l'annee precedente.
-    clients = _lignes(cx, """
-        SELECT annee, mois, code_client, client,
-               ROUND(SUM(total_ht), 2) AS ht,
-               COUNT(DISTINCT facture) AS factures
-        FROM lignes GROUP BY annee, mois, code_client, client
-    """)
+        factures = _lignes(cx, """
+            SELECT annee, COUNT(*) AS nb FROM factures GROUP BY annee
+        """)
 
-    factures = _lignes(cx, """
-        SELECT annee, COUNT(*) AS nb FROM factures GROUP BY annee
-    """)
-
-    dernieres = {
-        annee: derniere
-        for annee, derniere in cx.execute(
-            "SELECT annee, MAX(date) FROM factures GROUP BY annee"
+        dernieres = {
+            annee: derniere
+            for annee, derniere in cx.execute(
+                "SELECT annee, MAX(date) FROM factures GROUP BY annee"
+            )
+        }
+        derniere = max(dernieres.values(), default="")
+        ca_total = (
+            cx.execute("SELECT ROUND(SUM(total_ht), 2) FROM lignes").fetchone()[0] or 0
         )
-    }
-    derniere = max(dernieres.values(), default="")
-    ca_total = cx.execute("SELECT ROUND(SUM(total_ht), 2) FROM lignes").fetchone()[0] or 0
-    cx.close()
 
     # Une annee est dite incomplete si sa derniere facture est anterieure a
     # decembre : ses totaux ne sont alors pas comparables tels quels a une
