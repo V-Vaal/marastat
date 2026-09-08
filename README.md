@@ -35,12 +35,19 @@ fabrique un jeu fictif, au même gabarit que de vraies factures imprimées.
 
 ```bash
 git clone https://github.com/V-Vaal/marastat && cd marastat
+
+python3 -m venv .venv
+. .venv/bin/activate            # Windows : .venv\Scripts\activate
 python -m pip install -e ".[dev]"
 
 python outils/generer_demo.py
 python -m marastat --factures exemples/factures --sortie exemples/rapport \
     --sans-ouverture --sans-notification
 ```
+
+L'environnement virtuel n'est pas une coquetterie : la plupart des
+distributions Linux refusent désormais d'installer un paquet dans le Python du
+système.
 
 Sortie attendue :
 
@@ -240,14 +247,21 @@ rapport.
 ## Développement
 
 ```bash
+python3 -m venv .venv && . .venv/bin/activate
 python -m pip install -e ".[dev]"
-python -m pytest -q
-python -m ruff check marastat tests outils
+python outils/controle.py
 ```
 
-L'intégration continue exécute le lint, la suite de tests et la chaîne
-complète sur le jeu de démonstration, sous Linux et Windows, en Python 3.10 et
-3.12. Le rapport produit par la CI est publié en artefact de build.
+`outils/controle.py` rejoue en local ce que fait l'intégration continue : lint,
+suite de tests, puis la chaîne complète sur le jeu de démonstration dans un
+dossier temporaire. Une dizaine de secondes, à lancer avant de pousser.
+
+La CI, elle, couvre Linux **et Windows**, en Python 3.10 et 3.12, et publie le
+rapport produit en artefact de build. La distinction compte : certaines fautes
+ne se voient que d'un côté. Un fichier SQLite laissé ouvert se renomme sans
+histoire sous Linux et échoue sous Windows, alors que l'outil publie justement
+ses trois livrables par renommage. `tests/test_hygiene.py` transforme ce genre
+de piège en invariant vérifiable depuis n'importe quel système.
 
 ## Licence
 

@@ -1,6 +1,8 @@
 import sqlite3
 from types import SimpleNamespace
 
+from aide import connexion
+
 from marastat.cli import (
     afficher_progression,
     exporter_csv,
@@ -51,7 +53,7 @@ def test_neutralisation_ne_touche_ni_les_nombres_ni_le_texte_ordinaire() -> None
 
 def test_export_csv_neutralise_les_formules(tmp_path) -> None:
     base = tmp_path / "ventes.sqlite"
-    with sqlite3.connect(base) as cx:
+    with connexion(base) as cx:
         cx.executescript(SCHEMA)
         cx.execute(
             "INSERT INTO factures VALUES (?,?,?,?,?,?,?,?,?,?)",
@@ -126,7 +128,7 @@ def _est_fermee(cx) -> bool:
 
 
 def _base_minimale(chemin) -> None:
-    with sqlite3.connect(chemin) as cx:
+    with connexion(chemin) as cx:
         cx.executescript(SCHEMA)
         cx.execute(
             "INSERT INTO factures VALUES (?,?,?,?,?,?,?,?,?,?)",

@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from aide import connexion
 
 from marastat.etl import SCHEMA, Rapport
 from marastat.rapport import GABARIT, agreger
@@ -36,7 +37,7 @@ def test_clients_de_meme_nom_restent_separes_et_ancienne_annee_non_marquee(
     tmp_path: Path,
 ) -> None:
     base = tmp_path / "ventes.sqlite"
-    with sqlite3.connect(base) as cx:
+    with connexion(base) as cx:
         cx.executescript(SCHEMA)
         _ajouter(cx, "F-2024-1", 2024, 11, "1", "Même nom")
         _ajouter(cx, "F-2025-1", 2025, 12, "2", "Même nom")
@@ -69,7 +70,7 @@ def test_agreger_ne_laisse_aucune_connexion_ouverte(tmp_path, monkeypatch) -> No
     l'appelant s'apprête à renommer : la connexion doit être refermée.
     """
     base = tmp_path / "ventes.sqlite"
-    with sqlite3.connect(base) as cx:
+    with connexion(base) as cx:
         cx.executescript(SCHEMA)
         _ajouter(cx, "F-2026-1", 2026, 1, "1", "Client")
 

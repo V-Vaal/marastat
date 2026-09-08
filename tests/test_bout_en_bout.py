@@ -9,11 +9,11 @@ fonction a la fois.
 from __future__ import annotations
 
 import importlib.util
-import sqlite3
 import sys
 from pathlib import Path
 
 import pytest
+from aide import connexion
 
 RACINE = Path(__file__).resolve().parents[1]
 
@@ -62,7 +62,7 @@ def test_les_trois_livrables_sont_publies(campagne: Path) -> None:
 
 def test_toute_facture_integree_reconcilie_au_centime(campagne: Path) -> None:
     """L'invariant central : somme des lignes == total HT imprime."""
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         ecarts = cx.execute("""
             SELECT numero, total_ht_imprime, total_ht_calcule
             FROM factures
@@ -73,7 +73,7 @@ def test_toute_facture_integree_reconcilie_au_centime(campagne: Path) -> None:
 
 def test_les_totaux_de_la_base_et_de_l_export_concordent(campagne: Path) -> None:
     """Base, export et rapport doivent decrire la meme campagne."""
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         somme_base, nb_base = cx.execute(
             "SELECT ROUND(SUM(total_ht), 2), COUNT(*) FROM lignes"
         ).fetchone()
@@ -97,7 +97,7 @@ def test_les_totaux_de_la_base_et_de_l_export_concordent(campagne: Path) -> None
 def test_une_facture_au_total_faux_est_ecartee_et_non_corrigee(
     campagne: Path,
 ) -> None:
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         presente = cx.execute(
             "SELECT COUNT(*) FROM factures WHERE numero = 'F-2025-9003'"
         ).fetchone()[0]
@@ -105,7 +105,7 @@ def test_une_facture_au_total_faux_est_ecartee_et_non_corrigee(
 
 
 def test_une_copie_a_l_identique_n_est_comptee_qu_une_fois(campagne: Path) -> None:
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         fichiers = cx.execute(
             "SELECT fichier FROM factures WHERE numero = 'F-2024-0004'"
         ).fetchall()
@@ -115,7 +115,7 @@ def test_une_copie_a_l_identique_n_est_comptee_qu_une_fois(campagne: Path) -> No
 def test_deux_factures_contradictoires_sont_toutes_deux_ecartees(
     campagne: Path,
 ) -> None:
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         presente = cx.execute(
             "SELECT COUNT(*) FROM factures WHERE numero = 'F-2025-9002'"
         ).fetchone()[0]
@@ -125,7 +125,7 @@ def test_deux_factures_contradictoires_sont_toutes_deux_ecartees(
 def test_une_ligne_sans_libelle_reste_visible_sans_etre_devinee(
     campagne: Path,
 ) -> None:
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         nb, montant = cx.execute("""
             SELECT COUNT(*), ROUND(SUM(total_ht), 2) FROM lignes
             WHERE classement = 'non identifie'
@@ -133,7 +133,7 @@ def test_une_ligne_sans_libelle_reste_visible_sans_etre_devinee(
     assert nb > 0
     assert montant > 0
     # Elle est bien comptee dans le chiffre d'affaires, pas ecartee.
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         total = cx.execute("SELECT ROUND(SUM(total_ht), 2) FROM lignes").fetchone()[0]
     assert montant < total
 
@@ -145,7 +145,7 @@ def test_le_gabarit_sans_colonne_ref_est_lu_comme_les_autres(
     campagne: Path,
 ) -> None:
     """Le changement de gabarit de 2026 ne doit rien casser."""
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         lignes_2026 = cx.execute(
             "SELECT COUNT(*) FROM lignes WHERE annee = 2026"
         ).fetchone()[0]
@@ -159,7 +159,7 @@ def test_le_gabarit_sans_colonne_ref_est_lu_comme_les_autres(
 def test_une_designation_longue_est_recollee_sur_une_seule_ligne(
     campagne: Path,
 ) -> None:
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         libelle = cx.execute("""
             SELECT libelle FROM lignes
             WHERE facture = 'F-2025-9001' AND legume LIKE 'Pomme de terre%'
@@ -177,7 +177,7 @@ def test_une_designation_piegee_n_est_pas_executable_dans_un_tableur(
 
 def test_toutes_les_lignes_portent_une_unite_tracee(campagne: Path) -> None:
     """Une unite deduite doit toujours etre signalee comme telle."""
-    with sqlite3.connect(campagne / "ventes.sqlite") as cx:
+    with connexion(campagne / "ventes.sqlite") as cx:
         sources = {
             r[0] for r in cx.execute("SELECT DISTINCT unite_source FROM lignes")
         }
