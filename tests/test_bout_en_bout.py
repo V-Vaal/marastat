@@ -9,6 +9,7 @@ fonction a la fois.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -190,3 +191,34 @@ def test_le_jeu_de_demonstration_ne_declenche_aucune_alerte_de_date(
     """Les dates du jeu sont toutes plausibles : aucun faux positif attendu."""
     page = (campagne / "rapport.html").read_text(encoding="utf-8")
     assert '"dates_suspectes":[]' in page
+
+
+RAPPORT_PUBLIE = RACINE / "exemples" / "rapport-demo.html"
+
+# La date de génération est la seule donnée qui change d'une exécution à
+# l'autre. Tout le reste découle du jeu de démonstration, qui est déterministe.
+DATE_DE_GENERATION = re.compile(r'"genere_le":"[^"]*"')
+
+
+def _hors_date(page: str) -> str:
+    return DATE_DE_GENERATION.sub('"genere_le":"…"', page)
+
+
+def test_le_rapport_publie_correspond_bien_au_code(campagne: Path) -> None:
+    """`exemples/rapport-demo.html` est un fichier généré, versionné à la main.
+
+    Rien n'empêcherait qu'il dérive du code et finisse par montrer un rapport
+    produit par une version disparue : c'est le défaut habituel des artefacts
+    committés. Ce test l'interdit en comparant le fichier publié à celui que le
+    code produit maintenant, sur le même jeu de démonstration déterministe.
+    """
+    assert RAPPORT_PUBLIE.is_file(), f"{RAPPORT_PUBLIE} manquant"
+
+    frais = (campagne / "rapport.html").read_text(encoding="utf-8")
+    publie = RAPPORT_PUBLIE.read_text(encoding="utf-8")
+
+    assert _hors_date(publie) == _hors_date(frais), (
+        "Le rapport publié ne correspond plus à ce que produit le code.\n"
+        "Le régénérer :\n"
+        "    python outils/controle.py --rafraichir-demo"
+    )

@@ -1,4 +1,15 @@
-"""Petits utilitaires partagés par les tests."""
+"""Petits utilitaires partagés par les tests.
+
+Ce module s'importe sans préfixe, `from aide import connexion`, et non
+`from tests.aide import ...` : `tests/` ne contient pas de `__init__.py`, donc
+pytest ajoute le dossier du fichier de test à `sys.path` avant de l'importer
+(mode d'import « prepend », celui par défaut). C'est un choix, pas un oubli.
+
+Sa contrepartie, à connaître avant de toucher à la configuration : ce mécanisme
+disparaît avec `--import-mode=importlib`, où il faudrait alors faire de `tests/`
+un paquet. Rien ne l'impose aujourd'hui, et le faire pour la forme casserait un
+montage qui fonctionne sur les quatre versions de Python couvertes.
+"""
 
 from __future__ import annotations
 

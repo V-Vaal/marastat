@@ -6,6 +6,9 @@
 [![licence MIT](https://img.shields.io/badge/licence-MIT-informational)](LICENSE)
 [![python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
 
+**[→ Voir un rapport de démonstration](https://v-vaal.github.io/marastat/exemples/rapport-demo.html)**
+(données fictives, fichier unique, hors ligne)
+
 > **In short (EN).** Marastat turns a folder of printed PDF invoices into a
 > single offline HTML sales report, plus a SQLite database and a flat CSV
 > export. No OCR, no manual re-entry, no data leaving the machine. It was
@@ -63,7 +66,7 @@ Sortie attendue :
 Ces quatre signalements ne sont pas des ratés : ce sont les cas que le jeu de
 démonstration contient exprès, et la façon dont l'outil les traite est tout
 son intérêt. Ouvrez ensuite `exemples/rapport/rapport.html`, ou regardez
-directement [`exemples/rapport-demo.html`](exemples/rapport-demo.html).
+celui qui est [publié en ligne](https://v-vaal.github.io/marastat/exemples/rapport-demo.html).
 
 ## Ce que ça produit
 
@@ -225,7 +228,10 @@ une démonstration et un jeu d'essai reproductible en intégration continue.
 | `marastat/cli.py` | Ligne de commande, export, publication atomique. |
 | `marastat/regles_legumes.csv` | Le seul fichier à éditer pour ajouter un produit. |
 | `outils/generer_demo.py` | Fabrique le jeu de factures fictives. |
+| `outils/controle.py` | Rejoue la chaîne de vérification en local. |
 | `outils/verifier.py` | Aide au développement : comparaison avec `pdftotext`. |
+| `tests/aide.py` | Utilitaires de test, importés sans préfixe (voir plus bas). |
+| `exemples/rapport-demo.html` | Le rapport publié. Régénéré, jamais écrit à la main. |
 
 ## Utilisation
 
@@ -255,6 +261,15 @@ python outils/controle.py
 `outils/controle.py` rejoue en local ce que fait l'intégration continue : lint,
 suite de tests, puis la chaîne complète sur le jeu de démonstration dans un
 dossier temporaire. Une dizaine de secondes, à lancer avant de pousser.
+
+Deux points à connaître avant de modifier les tests. Le rapport publié
+(`exemples/rapport-demo.html`) est un fichier généré : un test le compare à
+celui que le code produit maintenant, et `--rafraichir-demo` le republie. Il ne
+peut donc pas dériver en silence, comme le font d'ordinaire les artefacts
+versionnés. Et les tests s'importent entre eux sans préfixe
+(`from aide import connexion`), ce qui repose sur le mode d'import par défaut de
+pytest ; [`tests/aide.py`](tests/aide.py) explique pourquoi et ce que cela
+implique.
 
 La CI, elle, couvre Linux **et Windows**, en Python 3.10 et 3.12, et publie le
 rapport produit en artefact de build. La distinction compte : certaines fautes
