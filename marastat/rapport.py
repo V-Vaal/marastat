@@ -139,6 +139,7 @@ def agreger(
             "conflits": controle.conflits,
             "erreurs_lecture": controle.erreurs_lecture,
             "erreurs_arbitrage": controle.erreurs_arbitrage,
+            "dates_suspectes": controle.dates_suspectes,
             "lignes": controle.lignes,
             "lignes_non_identifiees": controle.lignes_non_identifiees,
             "ca_non_identifie": controle.ca_non_identifie,

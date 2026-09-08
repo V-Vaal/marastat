@@ -141,6 +141,11 @@ footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
   <h2>Saisonnalité</h2>
   <p class="sous">Répartition du chiffre d'affaires de chaque famille au fil des mois. Plus la case est foncée, plus le mois pèse dans les ventes de cette famille.</p>
   <div class="carte"><div class="defil" id="g-saison"></div><div id="lg-saison"></div></div>
+  <p class="avis">L'analyse doit être confirmée. Devant un chiffre surprenant
+  sur un mois ou une année, la date des factures concernées est la première
+  chose à regarder : c'est la seule information de la facture qui ne soit
+  vérifiée par aucune autre, et une date fausse déplace la vente sans que rien
+  ne le signale.</p>
 </section>
 
 <section>
@@ -572,6 +577,7 @@ function controle(){
   ajouterListe("Factures écartées",c.factures_rejetees);
   ajouterListe("Fichiers illisibles",c.erreurs_lecture);
   ajouterListe("Lignes d'arbitrage ignorées",c.erreurs_arbitrage);
+  ajouterListe("Dates invraisemblables (facture conservée, date à vérifier)",c.dates_suspectes||[]);
   noeuds.push(paragraphe(
     fort("Lignes non identifiées"),
     ` : ${c.lignes_non_identifiees} lignes, ${eur(c.ca_non_identifie)} (${nb(pc,1)} % du chiffre d'affaires). `,
@@ -588,7 +594,7 @@ function controle(){
   ));
   noeuds.push(paragraphe(
     fort("Dates."),
-    " L'année et le mois viennent de la date d'émission, jamais du numéro de facture ni du dossier."
+    " L'année et le mois viennent de la date d'émission, jamais du numéro de facture ni du dossier. Une date impossible fait écarter la facture, mais une date simplement fausse est acceptée telle quelle : elle déplace la vente dans un autre mois, voire dans une autre année, sans qu'aucun contrôle ne puisse la contredire."
   ));
   document.getElementById("controle-corps").replaceChildren(...noeuds);
 }

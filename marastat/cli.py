@@ -205,6 +205,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  DOUBLON   : {fichier} ({motif})")
     for fichier, motif in contexte.conflits:
         print(f"  CONFLIT   : {fichier} ({motif})")
+    for fichier, motif in contexte.dates_suspectes:
+        print(f"  DATE ?    : {fichier} ({motif})")
     for numero, motif in contexte.erreurs_arbitrage:
         print(f"  ARBITRAGE : ligne {numero} ignoree ({motif})")
     if contexte.lignes_non_identifiees:

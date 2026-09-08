@@ -182,3 +182,11 @@ def test_toutes_les_lignes_portent_une_unite_tracee(campagne: Path) -> None:
             r[0] for r in cx.execute("SELECT DISTINCT unite_source FROM lignes")
         }
     assert sources <= {"facture", "deduite", "inconnu"}
+
+
+def test_le_jeu_de_demonstration_ne_declenche_aucune_alerte_de_date(
+    campagne: Path,
+) -> None:
+    """Les dates du jeu sont toutes plausibles : aucun faux positif attendu."""
+    page = (campagne / "rapport.html").read_text(encoding="utf-8")
+    assert '"dates_suspectes":[]' in page

@@ -11,7 +11,8 @@ import csv
 import sqlite3
 from collections import Counter, defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from .catalogue import (
@@ -67,6 +68,10 @@ CREATE INDEX idx_lignes_legume ON lignes(legume);
 CREATE INDEX idx_lignes_client ON lignes(code_client);
 """
 
+# Au-dela de cet ecart en annees, une annee du corpus est consideree isolee
+# et ses factures sont signalees comme suspectes (jamais ecartees).
+ECART_ANNEE_ISOLEE = 2
+
 UNITES = {
     "kg": "kg",
     "k": "kg",
@@ -115,6 +120,7 @@ class Rapport:
     lignes_non_identifiees: int
     ca_non_identifie: float
     ca_total: float
+    dates_suspectes: list[tuple[str, str]] = field(default_factory=list)
     base_temporaire: Path | None = None
 
 
@@ -240,6 +246,62 @@ def selectionner_factures(
     return retenues, rejetees, doublons, conflits
 
 
+def reperer_dates_invraisemblables(
+    factures: list[Facture], aujourd_hui: date | None = None
+) -> list[tuple[str, str]]:
+    """Signale, sans jamais ecarter, les dates qui ne tiennent pas debout.
+
+    La date est le seul champ portant de la chaine qu'aucun autre champ ne
+    contredit : les montants sont recoupes ligne a ligne puis contre le total
+    imprime, les doublons sont compares sur leur contenu, mais une date
+    simplement fausse reconcilie parfaitement et deplace pourtant la vente
+    dans le mauvais mois, voire dans le mauvais exercice.
+
+    Deux signaux volontairement grossiers, choisis pour ne produire aucun faux
+    positif sur un corpus normal :
+
+    * une date posterieure a aujourd'hui, qui n'existe pas encore ;
+    * une annee isolee, c'est-a-dire separee de plus de deux ans de toute
+      autre annee du corpus (une saisie 2015 ou 2062 au lieu de 2025).
+
+    Une erreur de quelques semaines reste indetectable : rien dans la facture
+    ne permet de la contredire. Ce controle vise les fautes de frappe sur
+    l'annee, qui sont les plus rares et les plus destructrices.
+    """
+    aujourd_hui = aujourd_hui or date.today()
+    signalements: list[tuple[str, str]] = []
+
+    annees = sorted({facture.annee for facture in factures})
+    isolees = {
+        annee
+        for position, annee in enumerate(annees)
+        if min(
+            (
+                abs(annee - voisine)
+                for rang, voisine in enumerate(annees)
+                if rang != position
+            ),
+            default=0,
+        )
+        > ECART_ANNEE_ISOLEE
+    }
+
+    for facture in factures:
+        if facture.date > aujourd_hui.isoformat():
+            signalements.append(
+                (facture.fichier, f"date dans le futur ({facture.date})")
+            )
+        elif facture.annee in isolees:
+            signalements.append(
+                (
+                    facture.fichier,
+                    f"annee {facture.annee} isolee du reste des factures "
+                    f"({annees[0]} a {annees[-1]}) : date a verifier",
+                )
+            )
+    return signalements
+
+
 def unites_reference(
     factures: list[Facture], regles
 ) -> dict[str, str]:
@@ -277,6 +339,7 @@ def construire(
     # legume portent la meme unite, on l'applique aux lignes ou l'unite n'a
     # pas ete imprimee. Toute deduction est tracee dans unite_source.
     unite_par_legume = unites_reference(retenues, regles)
+    suspectes = reperer_dates_invraisemblables(retenues)
 
     base = Path(base)
     base.parent.mkdir(parents=True, exist_ok=True)
@@ -405,6 +468,7 @@ def construire(
         lignes_non_identifiees=nb_non_id,
         ca_non_identifie=round(ca_non_id, 2),
         ca_total=round(ca_total, 2),
+        dates_suspectes=suspectes,
         base_temporaire=base_temporaire,
     )
 

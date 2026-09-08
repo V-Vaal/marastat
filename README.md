@@ -139,6 +139,14 @@ dans des fichiers temporaires, puis mis en place ensemble une fois les trois
 produits. Une interruption laisse la campagne précédente entière et cohérente.
 Il n'existe pas d'état où un rapport à jour côtoie une base périmée.
 
+**Une date invraisemblable est signalée, jamais corrigée.** Une facture datée
+du futur, ou dont l'année est séparée de plus de deux ans de toutes les autres
+(une saisie `2015` au lieu de `2025`), est conservée dans les totaux et
+signalée en console comme dans le rapport. Le contrôle est volontairement
+grossier pour ne produire aucun faux positif : il vise les fautes de frappe
+sur l'année, qui sont les plus destructrices, et n'invente jamais de
+correction.
+
 **Un libellé de facture n'est jamais exécutable.** Les désignations viennent
 de PDF tiers. Toute cellule de l'export qui commence par `=`, `+`, `-` ou `@`
 est préfixée d'une apostrophe : ouvrir `ventes.csv` dans un tableur ne peut
@@ -164,6 +172,17 @@ quelques semaines par rapport aux récoltes.
 **L'année vient de la date d'émission**, jamais du numéro de facture ni du nom
 du dossier : il existe des factures numérotées `F-2026-xxxx` datées de
 décembre 2025.
+
+**Une date fausse fausse l'analyse, et presque rien ne la contredit.** Tous
+les montants sont recoupés : chaque ligne est vérifiée au centime, chaque
+facture doit retomber sur son total imprimé, les doublons sont comparés sur
+leur contenu complet. La date, elle, n'est confrontée à rien. Une date
+impossible (30 février) fait écarter la facture, et un contrôle de
+vraisemblance signale les dates situées dans le futur ou dans une année isolée
+du reste du corpus, mais une erreur de quelques semaines reste indétectable :
+elle déplace la vente dans la saisonnalité sans qu'aucun contrôle ne puisse la
+démentir. C'est le seul champ portant de la chaîne dans ce cas, et le rapport
+le rappelle sous le graphique de saisonnalité.
 
 **Une année en cours n'est pas comparable à une année pleine.** Le rapport
 compare à période équivalente (mêmes mois de part et d'autre) et signale
