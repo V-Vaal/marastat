@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marastat — rapport de ventes</title>
+<style>
+:root{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --bord:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --seq-100:#cde2fb; --seq-200:#9ec5f4; --seq-300:#6da7ec;
+  --seq-400:#3987e5; --seq-500:#256abf; --seq-600:#184f95; --seq-700:#0d366b;
+  --good:#006300; --bad:#d03b3b; --warn:#fab219;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --bord:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --seq-100:#0d366b; --seq-200:#184f95; --seq-300:#256abf;
+    --seq-400:#3987e5; --seq-500:#6da7ec; --seq-600:#9ec5f4; --seq-700:#cde2fb;
+    --good:#0ca30c; --bad:#e66767;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0d0d0d; --surface:#1a1a19;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --bord:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --seq-100:#0d366b; --seq-200:#184f95; --seq-300:#256abf;
+  --seq-400:#3987e5; --seq-500:#6da7ec; --seq-600:#9ec5f4; --seq-700:#cde2fb;
+  --good:#0ca30c; --bad:#e66767;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 64px}
+header h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
+header p{margin:0;color:var(--ink-2);font-size:14px}
+.avis{margin:16px 0 0;padding:11px 13px;border-radius:10px;
+  background:color-mix(in srgb,var(--warn) 14%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);
+  font-size:13.5px;color:var(--ink)}
+.filtres{position:sticky;top:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;
+  margin:20px 0 18px;padding:10px 0;background:var(--plane)}
+.filtres button{font:inherit;font-size:14px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--bord);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.filtres button[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:600}
+section{margin:0 0 30px}
+h2{font-size:16px;margin:0 0 3px;letter-spacing:-.005em}
+.sous{margin:0 0 14px;color:var(--muted);font-size:13px}
+.carte{background:var(--surface);border:1px solid var(--bord);border-radius:12px;padding:14px}
+.tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:10px}
+.tuile{background:var(--surface);border:1px solid var(--bord);border-radius:12px;padding:13px 14px}
+.tuile .lab{font-size:12.5px;color:var(--muted);margin-bottom:3px}
+.tuile .val{font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.15}
+.tuile .sub{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.up{color:var(--good)} .down{color:var(--bad)}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.lg{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 10px;font-size:13px;color:var(--ink-2)}
+.lg span{display:inline-flex;align-items:center;gap:6px}
+.pastille{width:11px;height:11px;border-radius:3px;flex:none}
+.echelle{display:flex;align-items:center;gap:7px;margin:10px 0 0;font-size:12px;color:var(--muted)}
+.echelle i{width:22px;height:11px;border-radius:2px;display:inline-block}
+.defil{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th:first-child,td:first-child{text-align:left;white-space:normal;min-width:132px}
+thead th{color:var(--muted);font-weight:600;font-size:12.5px;cursor:pointer;
+  position:sticky;top:0;background:var(--surface)}
+thead th:hover{color:var(--ink)}
+tbody tr:last-child td{border-bottom:none}
+tfoot td{font-weight:650;border-top:2px solid var(--axis);border-bottom:none}
+.bulle{position:fixed;pointer-events:none;z-index:50;opacity:0;transition:opacity .09s;
+  background:var(--surface);border:1px solid var(--bord);border-radius:9px;
+  padding:7px 10px;font-size:13px;box-shadow:0 6px 22px rgba(0,0,0,.16);max-width:240px}
+.bulle b{display:block;margin-bottom:2px}
+details{background:var(--surface);border:1px solid var(--bord);border-radius:12px;padding:12px 14px}
+summary{cursor:pointer;font-weight:600;font-size:14.5px}
+details p,details li{font-size:13.5px;color:var(--ink-2)}
+.mini{font-size:12.5px;color:var(--muted)}
+.bascule{display:inline-flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.bascule button{font:inherit;font-size:13px;padding:5px 11px;border-radius:8px;
+  border:1px solid var(--bord);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.bascule button[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff}
+footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Rapport de ventes</h1>
+  <p id="periode"></p>
+</header>
+<div id="avis"></div>
+
+<div class="filtres" id="filtres" role="group" aria-label="Filtrer par année"></div>
+
+<section>
+  <h2>Vue d'ensemble</h2>
+  <p class="sous" id="sous-tuiles"></p>
+  <div class="tuiles" id="tuiles"></div>
+</section>
+
+<section>
+  <h2>Chiffre d'affaires mois par mois</h2>
+  <p class="sous">Montants hors taxes, par mois de facturation.</p>
+  <div class="carte">
+    <div class="lg" id="lg-mois"></div>
+    <div id="g-mois"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Légumes</h2>
+  <p class="sous" id="sous-legumes"></p>
+  <div class="carte">
+    <div class="bascule" id="bascule-leg" role="group" aria-label="Mesure">
+      <button data-mesure="ht" aria-pressed="true">Chiffre d'affaires</button>
+      <button data-mesure="kg" aria-pressed="false">Volume (kg)</button>
+      <button data-mesure="p" aria-pressed="false">Volume (pièces)</button>
+    </div>
+    <div id="g-legumes"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Détail par légume</h2>
+  <p class="sous">Cliquer sur un en-tête pour trier.</p>
+  <div class="carte defil"><table id="t-legumes"></table></div>
+</section>
+
+<section>
+  <h2>Saisonnalité</h2>
+  <p class="sous">Répartition du chiffre d'affaires de chaque famille au fil des mois. Plus la case est foncée, plus le mois pèse dans les ventes de cette famille.</p>
+  <div class="carte"><div class="defil" id="g-saison"></div><div id="lg-saison"></div></div>
+</section>
+
+<section>
+  <h2>Clients</h2>
+  <p class="sous" id="sous-clients"></p>
+  <div class="carte"><div id="g-clients"></div></div>
+</section>
+
+<section>
+  <h2>Détail par client</h2>
+  <p class="sous" id="sous-t-clients">Chiffre d'affaires par année et évolution.</p>
+  <div class="carte defil"><table id="t-clients"></table></div>
+</section>
+
+<section>
+  <h2>Contrôle des données</h2>
+  <p class="sous">À lire avant d'utiliser ces chiffres ailleurs.</p>
+  <details id="controle"><summary>Comment ces chiffres ont été obtenus</summary><div id="controle-corps"></div></details>
+</section>
+
+<footer id="pied"></footer>
+</div>
+<div class="bulle" id="bulle" role="status" aria-live="polite"></div>
+
+<script id="donnees" type="application/json">{"meta":{"annees":[2024,2025,2026],"incompletes":[2026],"dernier_mois":{"2024":12,"2025":12,"2026":6},"derniere_facture_par_annee":{"2024":"31 décembre 2024","2025":"31 décembre 2025","2026":"29 juin 2026"},"mois_courts":["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."],"mois_longs":["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"],"derniere_facture":"29 juin 2026","libelle_periode":"2024 à 2026","ca_total":11916.25,"genere_le":"08/09/2026"},"legumes":[{"annee":2024,"mois":1,"famille":"Carotte","legume":"Carotte","ht":99.49,"kg":54.5,"p":0.0},{"annee":2024,"mois":1,"famille":"Oignon","legume":"Oignon jaune","ht":122.85,"kg":64.0,"p":0.0},{"annee":2024,"mois":1,"famille":"Poireau","legume":"Poireau","ht":126.96,"kg":53.5,"p":0.0},{"annee":2024,"mois":2,"famille":"Carotte","legume":"Carotte","ht":63.83,"kg":34.5,"p":0.0},{"annee":2024,"mois":2,"famille":"Oignon","legume":"Oignon jaune","ht":66.3,"kg":34.0,"p":0.0},{"annee":2024,"mois":2,"famille":"Poireau","legume":"Poireau","ht":34.02,"kg":14.5,"p":0.0},{"annee":2024,"mois":3,"famille":"Carotte","legume":"Carotte","ht":51.8,"kg":28.0,"p":0.0},{"annee":2024,"mois":3,"famille":"Choux","legume":"Chou-fleur","ht":101.72,"kg":0.0,"p":46.0},{"annee":2024,"mois":3,"famille":"Poireau","legume":"Poireau","ht":51.6,"kg":21.5,"p":0.0},{"annee":2024,"mois":3,"famille":"Épinard","legume":"Épinard","ht":136.02,"kg":33.5,"p":0.0},{"annee":2024,"mois":4,"famille":"Carotte","legume":"Carotte","ht":29.6,"kg":16.0,"p":0.0},{"annee":2024,"mois":4,"famille":"Choux","legume":"Chou-fleur","ht":101.89,"kg":0.0,"p":45.0},{"annee":2024,"mois":4,"famille":"Radis","legume":"Radis botte","ht":46.58,"kg":0.0,"p":41.0},{"annee":2024,"mois":4,"famille":"Salade","legume":"Salade","ht":21.85,"kg":0.0,"p":24.0},{"annee":2024,"mois":4,"famille":"Épinard","legume":"Épinard","ht":192.7,"kg":47.0,"p":0.0},{"annee":2024,"mois":5,"famille":"Courgette","legume":"Courgette","ht":38.85,"kg":18.5,"p":0.0},{"annee":2024,"mois":5,"famille":"Radis","legume":"Radis botte","ht":38.53,"kg":0.0,"p":34.0},{"annee":2024,"mois":5,"famille":"Salade","legume":"Salade","ht":13.54,"kg":0.0,"p":15.0},{"annee":2024,"mois":5,"famille":"Épinard","legume":"Épinard","ht":94.3,"kg":23.0,"p":0.0},{"annee":2024,"mois":6,"famille":"Betterave","legume":"Betterave","ht":73.29,"kg":36.5,"p":0.0},{"annee":2024,"mois":6,"famille":"Courgette","legume":"Courgette","ht":90.3,"kg":43.0,"p":0.0},{"annee":2024,"mois":6,"famille":"Radis","legume":"Radis botte","ht":43.13,"kg":0.0,"p":38.0},{"annee":2024,"mois":6,"famille":"Salade","legume":"Salade","ht":36.86,"kg":0.0,"p":40.0},{"annee":2024,"mois":6,"famille":"Tomate","legume":"Tomate","ht":128.0,"kg":40.0,"p":0.0},{"annee":2024,"mois":7,"famille":"Betterave","legume":"Betterave","ht":59.46,"kg":29.0,"p":0.0},{"annee":2024,"mois":7,"famille":"Courgette","legume":"Courgette","ht":169.52,"kg":82.0,"p":0.0},{"annee":2024,"mois":7,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":145.96,"kg":92.5,"p":0.0},{"annee":2024,"mois":7,"famille":"Salade","legume":"Salade","ht":52.26,"kg":0.0,"p":55.0},{"annee":2024,"mois":7,"famille":"Tomate","legume":"Tomate","ht":372.8,"kg":116.5,"p":0.0},{"annee":2024,"mois":8,"famille":"Betterave","legume":"Betterave","ht":55.35,"kg":27.0,"p":0.0},{"annee":2024,"mois":8,"famille":"Courgette","legume":"Courgette","ht":48.3,"kg":23.0,"p":0.0},{"annee":2024,"mois":8,"famille":"Oignon","legume":"Oignon jaune","ht":39.0,"kg":20.0,"p":0.0},{"annee":2024,"mois":8,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":64.36,"kg":41.5,"p":0.0},{"annee":2024,"mois":8,"famille":"Salade","legume":"Salade","ht":33.63,"kg":0.0,"p":36.0},{"annee":2024,"mois":9,"famille":"Betterave","legume":"Betterave","ht":24.6,"kg":12.0,"p":0.0},{"annee":2024,"mois":9,"famille":"Courges","legume":"Potimarron","ht":114.76,"kg":51.0,"p":0.0},{"annee":2024,"mois":9,"famille":"Courgette","legume":"Courgette","ht":174.3,"kg":83.0,"p":0.0},{"annee":2024,"mois":9,"famille":"Oignon","legume":"Oignon jaune","ht":27.64,"kg":14.5,"p":0.0},{"annee":2024,"mois":9,"famille":"Poireau","legume":"Poireau","ht":157.2,"kg":65.5,"p":0.0},{"annee":2024,"mois":9,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":29.6,"kg":18.5,"p":0.0},{"annee":2024,"mois":9,"famille":"Salade","legume":"Salade","ht":69.83,"kg":0.0,"p":74.0},{"annee":2024,"mois":9,"famille":"Tomate","legume":"Tomate","ht":150.4,"kg":47.0,"p":0.0},{"annee":2024,"mois":10,"famille":"Betterave","legume":"Betterave","ht":87.13,"kg":42.5,"p":0.0},{"annee":2024,"mois":10,"famille":"Carotte","legume":"Carotte","ht":29.6,"kg":16.0,"p":0.0},{"annee":2024,"mois":10,"famille":"Choux","legume":"Chou-fleur","ht":104.65,"kg":0.0,"p":46.0},{"annee":2024,"mois":10,"famille":"Courges","legume":"Potimarron","ht":57.38,"kg":25.5,"p":0.0},{"annee":2024,"mois":10,"famille":"Poireau","legume":"Poireau","ht":76.8,"kg":32.0,"p":0.0},{"annee":2024,"mois":10,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":29.2,"kg":19.0,"p":0.0},{"annee":2024,"mois":10,"famille":"Salade","legume":"Salade","ht":27.79,"kg":0.0,"p":30.0},{"annee":2024,"mois":10,"famille":"Épinard","legume":"Épinard","ht":77.9,"kg":19.0,"p":0.0},{"annee":2024,"mois":11,"famille":"Carotte","legume":"Carotte","ht":26.36,"kg":15.0,"p":0.0},{"annee":2024,"mois":11,"famille":"Choux","legume":"Chou-fleur","ht":8.74,"kg":0.0,"p":4.0},{"annee":2024,"mois":11,"famille":"Oignon","legume":"Oignon jaune","ht":37.05,"kg":20.0,"p":0.0},{"annee":2024,"mois":12,"famille":"Carotte","legume":"Carotte","ht":27.75,"kg":15.0,"p":0.0},{"annee":2024,"mois":12,"famille":"Choux","legume":"Chou-fleur","ht":58.65,"kg":0.0,"p":26.0},{"annee":2024,"mois":12,"famille":"Courges","legume":"Potimarron","ht":18.0,"kg":8.0,"p":0.0},{"annee":2024,"mois":12,"famille":"Oignon","legume":"Oignon jaune","ht":49.73,"kg":25.5,"p":0.0},{"annee":2024,"mois":12,"famille":"Poireau","legume":"Poireau","ht":19.2,"kg":8.0,"p":0.0},{"annee":2024,"mois":12,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":10.4,"kg":6.5,"p":0.0},{"annee":2025,"mois":1,"famille":"Carotte","legume":"Carotte","ht":79.27,"kg":41.5,"p":0.0},{"annee":2025,"mois":1,"famille":"Oignon","legume":"Oignon jaune","ht":70.35,"kg":35.0,"p":0.0},{"annee":2025,"mois":1,"famille":"Poireau","legume":"Poireau","ht":81.27,"kg":33.5,"p":0.0},{"annee":2025,"mois":2,"famille":"Carotte","legume":"Carotte","ht":22.92,"kg":12.0,"p":0.0},{"annee":2025,"mois":2,"famille":"Oignon","legume":"Oignon jaune","ht":40.2,"kg":20.0,"p":0.0},{"annee":2025,"mois":2,"famille":"Poireau","legume":"Poireau","ht":46.93,"kg":20.0,"p":0.0},{"annee":2025,"mois":3,"famille":"Carotte","legume":"Carotte","ht":119.38,"kg":62.5,"p":0.0},{"annee":2025,"mois":3,"famille":"Choux","legume":"Chou-fleur","ht":177.16,"kg":0.0,"p":76.0},{"annee":2025,"mois":3,"famille":"Poireau","legume":"Poireau","ht":122.27,"kg":49.5,"p":0.0},{"annee":2025,"mois":3,"famille":"Épinard","legume":"Épinard","ht":357.54,"kg":86.0,"p":0.0},{"annee":2025,"mois":4,"famille":"Carotte","legume":"Carotte","ht":120.34,"kg":63.0,"p":0.0},{"annee":2025,"mois":4,"famille":"Choux","legume":"Chou-fleur","ht":94.8,"kg":0.0,"p":40.0},{"annee":2025,"mois":4,"famille":"Radis","legume":"Radis botte","ht":40.71,"kg":0.0,"p":35.0},{"annee":2025,"mois":4,"famille":"Salade","legume":"Salade","ht":31.36,"kg":0.0,"p":32.0},{"annee":2025,"mois":4,"famille":"Épinard","legume":"Épinard","ht":181.46,"kg":43.0,"p":0.0},{"annee":2025,"mois":5,"famille":"Courgette","legume":"Courgette","ht":43.2,"kg":20.0,"p":0.0},{"annee":2025,"mois":5,"famille":"Radis","legume":"Radis botte","ht":9.44,"kg":0.0,"p":8.0},{"annee":2025,"mois":5,"famille":"Salade","legume":"Salade","ht":34.3,"kg":0.0,"p":35.0},{"annee":2025,"mois":5,"famille":"Épinard","legume":"Épinard","ht":192.01,"kg":45.5,"p":0.0},{"annee":2025,"mois":6,"famille":"Betterave","legume":"Betterave","ht":73.85,"kg":35.0,"p":0.0},{"annee":2025,"mois":6,"famille":"Courgette","legume":"Courgette","ht":65.88,"kg":30.5,"p":0.0},{"annee":2025,"mois":6,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":30.6,"kg":18.0,"p":0.0},{"annee":2025,"mois":6,"famille":"Radis","legume":"Radis botte","ht":23.6,"kg":0.0,"p":20.0},{"annee":2025,"mois":6,"famille":"Salade","legume":"Salade","ht":47.92,"kg":0.0,"p":50.0},{"annee":2025,"mois":6,"famille":"Tomate","legume":"Tomate","ht":181.5,"kg":55.0,"p":0.0},{"annee":2025,"mois":7,"famille":"Betterave","legume":"Betterave","ht":50.64,"kg":24.0,"p":0.0},{"annee":2025,"mois":7,"famille":"Courgette","legume":"Courgette","ht":95.04,"kg":44.0,"p":0.0},{"annee":2025,"mois":7,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":30.53,"kg":18.5,"p":0.0},{"annee":2025,"mois":7,"famille":"Salade","legume":"Salade","ht":28.91,"kg":0.0,"p":30.0},{"annee":2025,"mois":7,"famille":"Tomate","legume":"Tomate","ht":74.58,"kg":23.0,"p":0.0},{"annee":2025,"mois":8,"famille":"Betterave","legume":"Betterave","ht":25.32,"kg":12.0,"p":0.0},{"annee":2025,"mois":8,"famille":"Courgette","legume":"Courgette","ht":124.2,"kg":57.5,"p":0.0},{"annee":2025,"mois":8,"famille":"Oignon","legume":"Oignon jaune","ht":21.11,"kg":10.5,"p":0.0},{"annee":2025,"mois":8,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":31.35,"kg":19.0,"p":0.0},{"annee":2025,"mois":8,"famille":"Salade","legume":"Salade","ht":53.9,"kg":0.0,"p":55.0},{"annee":2025,"mois":8,"famille":"Tomate","legume":"Tomate","ht":110.55,"kg":33.5,"p":0.0},{"annee":2025,"mois":9,"famille":"Betterave","legume":"Betterave","ht":48.53,"kg":23.0,"p":0.0},{"annee":2025,"mois":9,"famille":"Courges","legume":"Potimarron","ht":55.68,"kg":24.0,"p":0.0},{"annee":2025,"mois":9,"famille":"Courgette","legume":"Courgette","ht":88.56,"kg":41.0,"p":0.0},{"annee":2025,"mois":9,"famille":"Oignon","legume":"Oignon jaune","ht":137.69,"kg":68.5,"p":0.0},{"annee":2025,"mois":9,"famille":"Poireau","legume":"Poireau","ht":144.75,"kg":59.0,"p":0.0},{"annee":2025,"mois":9,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":44.55,"kg":27.0,"p":0.0},{"annee":2025,"mois":9,"famille":"Salade","legume":"Salade","ht":6.05,"kg":0.0,"p":7.0},{"annee":2025,"mois":9,"famille":"Tomate","legume":"Tomate","ht":123.75,"kg":37.5,"p":0.0},{"annee":2025,"mois":10,"famille":"Betterave","legume":"Betterave","ht":32.49,"kg":16.0,"p":0.0},{"annee":2025,"mois":10,"famille":"Choux","legume":"Chou-fleur","ht":113.77,"kg":0.0,"p":48.0},{"annee":2025,"mois":10,"famille":"Courges","legume":"Potimarron","ht":148.48,"kg":64.0,"p":0.0},{"annee":2025,"mois":10,"famille":"Oignon","legume":"Oignon jaune","ht":15.28,"kg":8.0,"p":0.0},{"annee":2025,"mois":10,"famille":"Poireau","legume":"Poireau","ht":79.05,"kg":33.0,"p":0.0},{"annee":2025,"mois":10,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":37.95,"kg":23.0,"p":0.0},{"annee":2025,"mois":10,"famille":"Salade","legume":"Salade","ht":36.55,"kg":0.0,"p":38.0},{"annee":2025,"mois":10,"famille":"Épinard","legume":"Épinard","ht":278.52,"kg":66.0,"p":0.0},{"annee":2025,"mois":11,"famille":"Carotte","legume":"Carotte","ht":79.27,"kg":41.5,"p":0.0},{"annee":2025,"mois":11,"famille":"Choux","legume":"Chou-fleur","ht":146.94,"kg":0.0,"p":62.0},{"annee":2025,"mois":11,"famille":"Courges","legume":"Potimarron","ht":35.26,"kg":16.0,"p":0.0},{"annee":2025,"mois":11,"famille":"Oignon","legume":"Oignon jaune","ht":91.46,"kg":45.5,"p":0.0},{"annee":2025,"mois":11,"famille":"Poireau","legume":"Poireau","ht":119.93,"kg":49.5,"p":0.0},{"annee":2025,"mois":11,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":34.0,"kg":21.0,"p":0.0},{"annee":2025,"mois":11,"famille":"Épinard","legume":"Épinard","ht":164.58,"kg":40.0,"p":0.0},{"annee":2025,"mois":12,"famille":"Carotte","legume":"Carotte","ht":61.12,"kg":32.0,"p":0.0},{"annee":2025,"mois":12,"famille":"Choux","legume":"Chou-fleur","ht":15.41,"kg":0.0,"p":7.0},{"annee":2025,"mois":12,"famille":"Courges","legume":"Potimarron","ht":118.32,"kg":51.0,"p":0.0},{"annee":2025,"mois":12,"famille":"Oignon","legume":"Oignon jaune","ht":76.88,"kg":39.0,"p":0.0},{"annee":2025,"mois":12,"famille":"Poireau","legume":"Poireau","ht":68.36,"kg":28.0,"p":0.0},{"annee":2025,"mois":12,"famille":"Pomme de terre","legume":"Pomme de terre (non précisée)","ht":13.2,"kg":8.0,"p":0.0},{"annee":2026,"mois":1,"famille":"Carotte","legume":"Carotte","ht":42.14,"kg":21.5,"p":0.0},{"annee":2026,"mois":1,"famille":"Oignon","legume":"Oignon jaune","ht":39.33,"kg":19.0,"p":0.0},{"annee":2026,"mois":1,"famille":"Poireau","legume":"Poireau","ht":129.54,"kg":51.0,"p":0.0},{"annee":2026,"mois":2,"famille":"Carotte","legume":"Carotte","ht":159.74,"kg":81.5,"p":0.0},{"annee":2026,"mois":2,"famille":"Oignon","legume":"Oignon jaune","ht":140.76,"kg":68.0,"p":0.0},{"annee":2026,"mois":2,"famille":"Poireau","legume":"Poireau","ht":145.42,"kg":58.0,"p":0.0},{"annee":2026,"mois":3,"famille":"Carotte","legume":"Carotte","ht":62.72,"kg":32.0,"p":0.0},{"annee":2026,"mois":3,"famille":"Choux","legume":"Chou-fleur","ht":136.64,"kg":0.0,"p":56.0},{"annee":2026,"mois":3,"famille":"Poireau","legume":"Poireau","ht":110.93,"kg":44.0,"p":0.0},{"annee":2026,"mois":3,"famille":"Épinard","legume":"Épinard","ht":234.25,"kg":55.0,"p":0.0},{"annee":2026,"mois":4,"famille":"Carotte","legume":"Carotte","ht":65.66,"kg":33.5,"p":0.0},{"annee":2026,"mois":4,"famille":"Choux","legume":"Chou-fleur","ht":76.62,"kg":0.0,"p":32.0},{"annee":2026,"mois":4,"famille":"Non identifié","legume":"Non identifié","ht":24.0,"kg":10.0,"p":0.0},{"annee":2026,"mois":4,"famille":"Radis","legume":"Radis botte","ht":53.68,"kg":0.0,"p":44.0},{"annee":2026,"mois":4,"famille":"Salade","legume":"Salade","ht":62.12,"kg":0.0,"p":62.0},{"annee":2026,"mois":4,"famille":"Épinard","legume":"Épinard","ht":201.84,"kg":47.0,"p":0.0},{"annee":2026,"mois":5,"famille":"Carotte","legume":"Carotte","ht":21.56,"kg":11.0,"p":0.0},{"annee":2026,"mois":5,"famille":"Courgette","legume":"Courgette","ht":71.37,"kg":32.0,"p":0.0},{"annee":2026,"mois":5,"famille":"Radis","legume":"Radis botte","ht":32.94,"kg":0.0,"p":27.0},{"annee":2026,"mois":5,"famille":"Salade","legume":"Salade","ht":16.16,"kg":0.0,"p":16.0},{"annee":2026,"mois":5,"famille":"Épinard","legume":"Épinard","ht":52.2,"kg":12.0,"p":0.0},{"annee":2026,"mois":6,"famille":"Betterave","legume":"Betterave","ht":138.89,"kg":64.0,"p":0.0},{"annee":2026,"mois":6,"famille":"Courgette","legume":"Courgette","ht":17.84,"kg":8.0,"p":0.0},{"annee":2026,"mois":6,"famille":"Radis","legume":"Radis botte","ht":68.32,"kg":0.0,"p":56.0},{"annee":2026,"mois":6,"famille":"Salade","legume":"Salade","ht":32.0,"kg":0.0,"p":32.0},{"annee":2026,"mois":6,"famille":"Tomate","legume":"Tomate","ht":89.5,"kg":27.0,"p":0.0}],"mensuel":[{"annee":2024,"mois":1,"ht":349.3},{"annee":2024,"mois":2,"ht":164.15},{"annee":2024,"mois":3,"ht":341.14},{"annee":2024,"mois":4,"ht":392.62},{"annee":2024,"mois":5,"ht":185.22},{"annee":2024,"mois":6,"ht":371.58},{"annee":2024,"mois":7,"ht":800.0},{"annee":2024,"mois":8,"ht":240.64},{"annee":2024,"mois":9,"ht":748.33},{"annee":2024,"mois":10,"ht":490.45},{"annee":2024,"mois":11,"ht":72.15},{"annee":2024,"mois":12,"ht":183.73},{"annee":2025,"mois":1,"ht":230.89},{"annee":2025,"mois":2,"ht":110.05},{"annee":2025,"mois":3,"ht":776.35},{"annee":2025,"mois":4,"ht":468.67},{"annee":2025,"mois":5,"ht":278.95},{"annee":2025,"mois":6,"ht":423.35},{"annee":2025,"mois":7,"ht":279.7},{"annee":2025,"mois":8,"ht":366.43},{"annee":2025,"mois":9,"ht":649.56},{"annee":2025,"mois":10,"ht":742.09},{"annee":2025,"mois":11,"ht":671.44},{"annee":2025,"mois":12,"ht":353.29},{"annee":2026,"mois":1,"ht":211.01},{"annee":2026,"mois":2,"ht":445.92},{"annee":2026,"mois":3,"ht":544.54},{"annee":2026,"mois":4,"ht":483.92},{"annee":2026,"mois":5,"ht":194.23},{"annee":2026,"mois":6,"ht":346.55}],"clients":[{"annee":2024,"mois":1,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":80.42,"factures":1},{"annee":2024,"mois":1,"code_client":"1108","client":"Épicerie du Bourg","ht":54.63,"factures":1},{"annee":2024,"mois":1,"code_client":"1153","client":"Restaurant Le Sillon","ht":83.78,"factures":1},{"annee":2024,"mois":1,"code_client":"1207","client":"Collège Jean Rostand","ht":63.02,"factures":1},{"annee":2024,"mois":1,"code_client":"1319","client":"Marché de la Halle","ht":67.45,"factures":1},{"annee":2024,"mois":2,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":34.65,"factures":1},{"annee":2024,"mois":2,"code_client":"1108","client":"Épicerie du Bourg","ht":75.85,"factures":1},{"annee":2024,"mois":2,"code_client":"1207","client":"Collège Jean Rostand","ht":53.65,"factures":1},{"annee":2024,"mois":3,"code_client":"1153","client":"Restaurant Le Sillon","ht":127.12,"factures":1},{"annee":2024,"mois":3,"code_client":"1264","client":"Foyer des Genêts","ht":132.5,"factures":1},{"annee":2024,"mois":3,"code_client":"1319","client":"Marché de la Halle","ht":81.52,"factures":1},{"annee":2024,"mois":4,"code_client":"1108","client":"Épicerie du Bourg","ht":68.55,"factures":1},{"annee":2024,"mois":4,"code_client":"1153","client":"Restaurant Le Sillon","ht":168.62,"factures":1},{"annee":2024,"mois":4,"code_client":"1319","client":"Marché de la Halle","ht":155.45,"factures":1},{"annee":2024,"mois":5,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":89.32,"factures":1},{"annee":2024,"mois":5,"code_client":"1207","client":"Collège Jean Rostand","ht":95.9,"factures":1},{"annee":2024,"mois":6,"code_client":"1108","client":"Épicerie du Bourg","ht":84.15,"factures":1},{"annee":2024,"mois":6,"code_client":"1153","client":"Restaurant Le Sillon","ht":72.41,"factures":1},{"annee":2024,"mois":6,"code_client":"1207","client":"Collège Jean Rostand","ht":110.01,"factures":1},{"annee":2024,"mois":6,"code_client":"1264","client":"Foyer des Genêts","ht":105.01,"factures":1},{"annee":2024,"mois":7,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":122.23,"factures":1},{"annee":2024,"mois":7,"code_client":"1108","client":"Épicerie du Bourg","ht":123.15,"factures":1},{"annee":2024,"mois":7,"code_client":"1153","client":"Restaurant Le Sillon","ht":174.31,"factures":1},{"annee":2024,"mois":7,"code_client":"1207","client":"Collège Jean Rostand","ht":141.91,"factures":1},{"annee":2024,"mois":7,"code_client":"1264","client":"Foyer des Genêts","ht":142.87,"factures":1},{"annee":2024,"mois":7,"code_client":"1319","client":"Marché de la Halle","ht":95.53,"factures":1},{"annee":2024,"mois":8,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":63.3,"factures":1},{"annee":2024,"mois":8,"code_client":"1264","client":"Foyer des Genêts","ht":48.23,"factures":1},{"annee":2024,"mois":8,"code_client":"1319","client":"Marché de la Halle","ht":129.11,"factures":1},{"annee":2024,"mois":9,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":110.0,"factures":1},{"annee":2024,"mois":9,"code_client":"1108","client":"Épicerie du Bourg","ht":91.44,"factures":1},{"annee":2024,"mois":9,"code_client":"1153","client":"Restaurant Le Sillon","ht":125.75,"factures":1},{"annee":2024,"mois":9,"code_client":"1207","client":"Collège Jean Rostand","ht":206.76,"factures":1},{"annee":2024,"mois":9,"code_client":"1264","client":"Foyer des Genêts","ht":214.38,"factures":1},{"annee":2024,"mois":10,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":33.27,"factures":1},{"annee":2024,"mois":10,"code_client":"1207","client":"Collège Jean Rostand","ht":236.68,"factures":1},{"annee":2024,"mois":10,"code_client":"1264","client":"Foyer des Genêts","ht":133.1,"factures":1},{"annee":2024,"mois":10,"code_client":"1319","client":"Marché de la Halle","ht":87.4,"factures":1},{"annee":2024,"mois":11,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":72.15,"factures":1},{"annee":2024,"mois":12,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":183.73,"factures":1},{"annee":2025,"mois":1,"code_client":"1108","client":"Épicerie du Bourg","ht":76.45,"factures":1},{"annee":2025,"mois":1,"code_client":"1153","client":"Restaurant Le Sillon","ht":47.42,"factures":1},{"annee":2025,"mois":1,"code_client":"1207","client":"Collège Jean Rostand","ht":107.02,"factures":1},{"annee":2025,"mois":2,"code_client":"1153","client":"Restaurant Le Sillon","ht":110.05,"factures":1},{"annee":2025,"mois":3,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":194.01,"factures":1},{"annee":2025,"mois":3,"code_client":"1108","client":"Épicerie du Bourg","ht":172.9,"factures":1},{"annee":2025,"mois":3,"code_client":"1153","client":"Restaurant Le Sillon","ht":161.48,"factures":1},{"annee":2025,"mois":3,"code_client":"1207","client":"Collège Jean Rostand","ht":119.99,"factures":1},{"annee":2025,"mois":3,"code_client":"1264","client":"Foyer des Genêts","ht":127.97,"factures":1},{"annee":2025,"mois":4,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":141.46,"factures":1},{"annee":2025,"mois":4,"code_client":"1153","client":"Restaurant Le Sillon","ht":148.25,"factures":1},{"annee":2025,"mois":4,"code_client":"1319","client":"Marché de la Halle","ht":178.96,"factures":1},{"annee":2025,"mois":5,"code_client":"1207","client":"Collège Jean Rostand","ht":130.72,"factures":1},{"annee":2025,"mois":5,"code_client":"1264","client":"Foyer des Genêts","ht":148.23,"factures":1},{"annee":2025,"mois":6,"code_client":"1108","client":"Épicerie du Bourg","ht":112.2,"factures":1},{"annee":2025,"mois":6,"code_client":"1153","client":"Restaurant Le Sillon","ht":123.8,"factures":2},{"annee":2025,"mois":6,"code_client":"1319","client":"Marché de la Halle","ht":187.35,"factures":1},{"annee":2025,"mois":7,"code_client":"1207","client":"Collège Jean Rostand","ht":97.62,"factures":1},{"annee":2025,"mois":7,"code_client":"1264","client":"Foyer des Genêts","ht":142.5,"factures":1},{"annee":2025,"mois":7,"code_client":"1319","client":"Marché de la Halle","ht":39.58,"factures":1},{"annee":2025,"mois":8,"code_client":"1153","client":"Restaurant Le Sillon","ht":170.81,"factures":1},{"annee":2025,"mois":8,"code_client":"1264","client":"Foyer des Genêts","ht":135.46,"factures":1},{"annee":2025,"mois":8,"code_client":"1319","client":"Marché de la Halle","ht":60.16,"factures":1},{"annee":2025,"mois":9,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":182.88,"factures":1},{"annee":2025,"mois":9,"code_client":"1108","client":"Épicerie du Bourg","ht":91.52,"factures":1},{"annee":2025,"mois":9,"code_client":"1207","client":"Collège Jean Rostand","ht":184.51,"factures":1},{"annee":2025,"mois":9,"code_client":"1264","client":"Foyer des Genêts","ht":88.07,"factures":1},{"annee":2025,"mois":9,"code_client":"1319","client":"Marché de la Halle","ht":102.58,"factures":1},{"annee":2025,"mois":10,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":165.07,"factures":1},{"annee":2025,"mois":10,"code_client":"1153","client":"Restaurant Le Sillon","ht":167.06,"factures":1},{"annee":2025,"mois":10,"code_client":"1207","client":"Collège Jean Rostand","ht":137.7,"factures":1},{"annee":2025,"mois":10,"code_client":"1264","client":"Foyer des Genêts","ht":78.07,"factures":1},{"annee":2025,"mois":10,"code_client":"1319","client":"Marché de la Halle","ht":194.19,"factures":1},{"annee":2025,"mois":11,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":200.6,"factures":1},{"annee":2025,"mois":11,"code_client":"1108","client":"Épicerie du Bourg","ht":67.58,"factures":1},{"annee":2025,"mois":11,"code_client":"1153","client":"Restaurant Le Sillon","ht":45.75,"factures":1},{"annee":2025,"mois":11,"code_client":"1207","client":"Collège Jean Rostand","ht":151.49,"factures":1},{"annee":2025,"mois":11,"code_client":"1264","client":"Foyer des Genêts","ht":206.02,"factures":1},{"annee":2025,"mois":12,"code_client":"1108","client":"Épicerie du Bourg","ht":83.26,"factures":1},{"annee":2025,"mois":12,"code_client":"1153","client":"Restaurant Le Sillon","ht":187.81,"factures":1},{"annee":2025,"mois":12,"code_client":"1264","client":"Foyer des Genêts","ht":82.22,"factures":1},{"annee":2026,"mois":1,"code_client":"1108","client":"Épicerie du Bourg","ht":125.22,"factures":1},{"annee":2026,"mois":1,"code_client":"1207","client":"Collège Jean Rostand","ht":85.79,"factures":1},{"annee":2026,"mois":2,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":112.92,"factures":1},{"annee":2026,"mois":2,"code_client":"1108","client":"Épicerie du Bourg","ht":63.99,"factures":1},{"annee":2026,"mois":2,"code_client":"1153","client":"Restaurant Le Sillon","ht":64.87,"factures":1},{"annee":2026,"mois":2,"code_client":"1207","client":"Collège Jean Rostand","ht":103.02,"factures":1},{"annee":2026,"mois":2,"code_client":"1319","client":"Marché de la Halle","ht":101.12,"factures":1},{"annee":2026,"mois":3,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":88.01,"factures":1},{"annee":2026,"mois":3,"code_client":"1207","client":"Collège Jean Rostand","ht":160.52,"factures":1},{"annee":2026,"mois":3,"code_client":"1264","client":"Foyer des Genêts","ht":82.02,"factures":1},{"annee":2026,"mois":3,"code_client":"1319","client":"Marché de la Halle","ht":213.99,"factures":1},{"annee":2026,"mois":4,"code_client":"1153","client":"Restaurant Le Sillon","ht":141.33,"factures":1},{"annee":2026,"mois":4,"code_client":"1264","client":"Foyer des Genêts","ht":169.46,"factures":2},{"annee":2026,"mois":4,"code_client":"1319","client":"Marché de la Halle","ht":173.13,"factures":1},{"annee":2026,"mois":5,"code_client":"1153","client":"Restaurant Le Sillon","ht":79.21,"factures":1},{"annee":2026,"mois":5,"code_client":"1319","client":"Marché de la Halle","ht":115.02,"factures":2},{"annee":2026,"mois":6,"code_client":"1042","client":"Cantine Municipale Bourgneuf","ht":23.03,"factures":1},{"annee":2026,"mois":6,"code_client":"1153","client":"Restaurant Le Sillon","ht":120.36,"factures":1},{"annee":2026,"mois":6,"code_client":"1264","client":"Foyer des Genêts","ht":139.44,"factures":1},{"annee":2026,"mois":6,"code_client":"1319","client":"Marché de la Halle","ht":63.72,"factures":1}],"factures":[{"annee":2024,"nb":40},{"annee":2025,"nb":42},{"annee":2026,"nb":22}],"controle":{"fichiers_vus":108,"factures_lues":108,"factures_integrees":104,"factures_rejetees":[["facture-F-2025-9003.pdf","somme des lignes 39.60 vs total imprime 42.00"]],"doublons":[["facture-F-2024-0004.pdf","meme contenu F-2024-0004 que copie-F-2024-0004.pdf"]],"conflits":[["facture-F-2025-9002-bis.pdf","numero F-2025-9002 contradictoire (facture-F-2025-9002-bis.pdf, facture-F-2025-9002.pdf)"],["facture-F-2025-9002.pdf","numero F-2025-9002 contradictoire (facture-F-2025-9002-bis.pdf, facture-F-2025-9002.pdf)"]],"erreurs_lecture":[],"erreurs_arbitrage":[],"lignes":415,"lignes_non_identifiees":2,"ca_non_identifie":24.0,"ca_total":11916.25}}</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById("donnees").textContent);
+const MOIS = D.meta.mois_courts;
+const MOIS_LONGS = D.meta.mois_longs;
+const SVGNS = "http://www.w3.org/2000/svg";
+let annee = "tout";
+
+const eur = n => new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Math.round(n))+" €";
+const nb  = (n,d=0) => new Intl.NumberFormat("fr-FR",{maximumFractionDigits:d}).format(n);
+const el  = (t,a={},...k)=>{const e=document.createElement(t);
+  for(const[c,v]of Object.entries(a)){if(c==="class")e.className=v;else e.setAttribute(c,v);}
+  k.flat().forEach(x=>e.append(x)); return e;};
+const s = (t,a={},...k)=>{const e=document.createElementNS(SVGNS,t);
+  for(const[c,v]of Object.entries(a))e.setAttribute(c,v);
+  k.flat().forEach(x=>e.append(x)); return e;};
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+/* Un SVG ne sait pas couper un texte trop long : on le fait a la main, en
+   gardant le nom entier dans l'infobulle. */
+const couper = (txt, largeur, taille=12.5) => {
+  const max = Math.max(3, Math.floor(largeur / (taille*0.52)));
+  return txt.length <= max ? txt : txt.slice(0, max-1).trimEnd()+"…";
+};
+
+/* ---------- infobulle ---------- */
+const bulle = document.getElementById("bulle");
+function montrer(ev, titre, corps){
+  const contenu = [el("b",{},String(titre))];
+  String(corps).split("<br>").forEach((ligne,i)=>{
+    if(i) contenu.push(el("br"));
+    contenu.push(ligne);
+  });
+  bulle.replaceChildren(...contenu);
+  bulle.style.opacity = 1;
+  const r = bulle.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY - r.height - 12;
+  if (x + r.width > innerWidth - 8) x = innerWidth - r.width - 8;
+  if (y < 8) y = ev.clientY + 18;
+  bulle.style.left = x+"px"; bulle.style.top = y+"px";
+}
+const cacher = () => bulle.style.opacity = 0;
+function survol(noeud, titre, corps){
+  noeud.style.cursor = "pointer";
+  noeud.addEventListener("pointerenter", e => montrer(e, titre, corps));
+  noeud.addEventListener("pointermove",  e => montrer(e, titre, corps));
+  noeud.addEventListener("pointerleave", cacher);
+  noeud.addEventListener("pointerdown",  e => montrer(e, titre, corps));
+}
+addEventListener("scroll", cacher, {passive:true});
+
+/* ---------- selection et periode comparable ---------- */
+function lignesFiltrees(){
+  return annee === "tout" ? D.legumes : D.legumes.filter(l => l.annee == annee);
+}
+function clientsFiltres(){
+  return annee === "tout" ? D.clients : D.clients.filter(c => c.annee == annee);
+}
+function cumul(rows, cle, champs){
+  const m = new Map();
+  for (const r of rows){
+    const k = r[cle];
+    if (!m.has(k)) m.set(k, Object.fromEntries(champs.map(c=>[c,0])));
+    const o = m.get(k);
+    for (const c of champs) o[c] += r[c] || 0;
+  }
+  return m;
+}
+const incomplete = an => D.meta.incompletes.includes(Number(an));
+const derniereFacture = an =>
+  D.meta.derniere_facture_par_annee[String(an)] || D.meta.derniere_facture;
+/* Derniere annee couverte : elle sert de reference pour les comparaisons. */
+const derniereAnnee = D.meta.annees[D.meta.annees.length-1];
+/* Comparer une annee en cours a une annee pleine fausse tout : on borne la
+   comparaison aux mois reellement couverts par la plus recente des deux. */
+function borneMois(an){
+  return incomplete(an) ? (D.meta.dernier_mois[String(an)] || 12) : 12;
+}
+function libellePeriode(an){
+  const m = borneMois(an);
+  return m >= 12 ? "" : ` (${MOIS[0]}–${MOIS[m-1]})`;
+}
+
+/* ---------- tuiles ---------- */
+function tuiles(){
+  const rows = lignesFiltrees();
+  const ht = rows.reduce((a,r)=>a+r.ht,0);
+  const kg = rows.reduce((a,r)=>a+r.kg,0);
+  const pc = rows.reduce((a,r)=>a+r.p,0);
+  const fa = annee==="tout" ? D.factures.reduce((a,f)=>a+f.nb,0)
+                            : (D.factures.find(f=>f.annee==annee)||{nb:0}).nb;
+  const cl = new Set(clientsFiltres().map(c=>c.code_client)).size;
+
+  let evol = "";
+  if (annee === "tout"){
+    evol = D.meta.annees.length + " années couvertes";
+  } else {
+    const m = borneMois(annee);
+    const cetteAnnee = D.legumes.filter(l=>l.annee==annee && l.mois<=m).reduce((a,r)=>a+r.ht,0);
+    const anPrec = D.legumes.filter(l=>l.annee==annee-1 && l.mois<=m).reduce((a,r)=>a+r.ht,0);
+    if (anPrec > 0){
+      const d = (cetteAnnee-anPrec)/anPrec*100;
+      evol = el("span",{},
+        el("span",{class:d>=0?"up":"down"},`${d>=0?"+":""}${nb(d,1)} %`),
+        ` vs ${annee-1}${libellePeriode(annee)}`);
+    } else {
+      evol = "pas de comparaison possible";
+    }
+  }
+
+  const t = document.getElementById("tuiles");
+  t.replaceChildren(
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Chiffre d'affaires HT"),
+        el("div",{class:"val"},eur(ht)), el("div",{class:"sub"},evol)),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Factures"),
+        el("div",{class:"val"},nb(fa)), el("div",{class:"sub"}, fa? "panier moyen "+eur(ht/fa):"")),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Clients servis"),
+        el("div",{class:"val"},nb(cl)), el("div",{class:"sub"},"ayant reçu au moins une facture")),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Volume au kilo"),
+        el("div",{class:"val"},nb(kg)+" kg"), el("div",{class:"sub"},"vendu au poids")),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Volume à la pièce"),
+        el("div",{class:"val"},nb(pc)), el("div",{class:"sub"},"pièces ou bottes"))
+  );
+  document.getElementById("sous-tuiles").textContent =
+    annee==="tout" ? "Toutes années confondues."
+                   : "Année "+annee+(incomplete(annee)?", arrêtée au "+derniereFacture(annee)+"." : ".");
+}
+
+/* ---------- CA mensuel ---------- */
+function graphMois(){
+  const box = document.getElementById("g-mois");
+  const L = 46, R = 14, H = 232, T = 12, B = 26;
+  const W = Math.max(box.clientWidth || 640, 320);
+  const pw = W-L-R, ph = H-T-B;
+  const cols = [css("--s1"), css("--s2"), css("--s3")];
+  const max = Math.max(...D.mensuel.map(m=>m.ht), 1);
+  const ymax = Math.ceil(max/1000)*1000 || 1000;
+  const x = i => L + (pw*i)/11;
+  const y = v => T + ph - (v/ymax)*ph;
+
+  const g = s("svg",{viewBox:`0 0 ${W} ${H}`,role:"img",
+    "aria-label":"Chiffre d'affaires par mois et par année"});
+  for (let i=0;i<=4;i++){
+    const v = ymax*i/4;
+    g.append(s("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css("--grid"),"stroke-width":1}));
+    g.append(s("text",{x:L-8,y:y(v)+4,"text-anchor":"end",fill:css("--muted"),"font-size":11},
+      String(Math.round(v/1000))+"k"));
+  }
+  // Sur un ecran etroit, douze libelles de mois se chevauchent : on n'en
+  // garde qu'un sur deux, les points restant survolables un par un.
+  const pas = pw < 330 ? 2 : 1;
+  MOIS.forEach((m,i)=>{ if (i % pas) return;
+    g.append(s("text",{x:x(i),y:H-8,"text-anchor":"middle",
+      fill:css("--muted"),"font-size":11}, m.replace(".","")));});
+
+  D.meta.annees.forEach((an,k)=>{
+    const pts = MOIS.map((_,i)=>{
+      const r = D.mensuel.find(m=>m.annee==an && m.mois==i+1);
+      return r ? [x(i), y(r.ht), r.ht] : null;
+    });
+    const actif = annee==="tout" || annee==an;
+    const coul = actif ? cols[k%3] : css("--grid");
+    let d = "", ouvert = false;
+    pts.forEach(p=>{ if(!p){ouvert=false;return;} d += (ouvert?" L":" M")+p[0]+" "+p[1]; ouvert=true; });
+    g.append(s("path",{d,fill:"none",stroke:coul,"stroke-width":2,
+      "stroke-linecap":"round","stroke-linejoin":"round",opacity:actif?1:.5}));
+    if (!actif) return;
+    pts.forEach((p,i)=>{ if(!p) return;
+      g.append(s("circle",{cx:p[0],cy:p[1],r:4.5,fill:coul,stroke:css("--surface"),"stroke-width":2}));
+      const zone = s("circle",{cx:p[0],cy:p[1],r:15,fill:"transparent"});
+      survol(zone, an+" — "+MOIS_LONGS[i], eur(p[2])); g.append(zone);
+    });
+  });
+  box.replaceChildren(g);
+
+  const lg = document.getElementById("lg-mois");
+  lg.replaceChildren(...D.meta.annees.map((an,k)=>{
+    const actif = annee==="tout" || annee==an;
+    return el("span",{}, el("i",{class:"pastille",
+      style:"background:"+(actif?cols[k%3]:css("--grid"))}), String(an));
+  }));
+}
+
+/* ---------- barres horizontales ---------- */
+function barres(box, items, coul){
+  const W = Math.max(box.clientWidth || 640, 320);
+  const lab = Math.min(190, Math.round(W*0.34));
+  const hb = 18, ecart = 11, T = 4;
+  const H = T + items.length*(hb+ecart);
+  const max = Math.max(...items.map(i=>i.v), 1);
+  const pw = W - lab - 70;
+  const g = s("svg",{viewBox:`0 0 ${W} ${H}`,role:"img"});
+  items.forEach((it,i)=>{
+    const yy = T + i*(hb+ecart);
+    const l = Math.max((it.v/max)*pw, 2);
+    g.append(s("text",{x:0,y:yy+hb/2+4,fill:css("--ink-2"),"font-size":12.5},
+      couper(it.nom, lab-8)));
+    g.append(s("rect",{x:lab,y:yy,width:l,height:hb,rx:4,fill:coul}));
+    g.append(s("text",{x:lab+l+7,y:yy+hb/2+4,fill:css("--ink-2"),"font-size":12,
+      "font-variant-numeric":"tabular-nums"}, it.txt));
+    const z = s("rect",{x:0,y:yy-4,width:W,height:hb+8,fill:"transparent"});
+    survol(z, it.nom, it.detail); g.append(z);
+  });
+  box.replaceChildren(g);
+}
+
+let mesureLeg = "ht";
+function graphLegumes(){
+  const m = cumul(lignesFiltrees(), "legume", ["ht","kg","p"]);
+  const items = [...m.entries()]
+    .map(([nom,v])=>({nom, v:v[mesureLeg], ht:v.ht, kg:v.kg, p:v.p}))
+    .filter(i=>i.v>0).sort((a,b)=>b.v-a.v).slice(0,14);
+  const total = [...m.values()].reduce((a,v)=>a+v[mesureLeg],0) || 1;
+  items.forEach(i=>{
+    i.txt = mesureLeg==="ht" ? eur(i.v) : nb(i.v)+(mesureLeg==="kg"?" kg":"");
+    i.detail = `${eur(i.ht)} · ${nb(i.kg)} kg · ${nb(i.p)} pièces<br>${nb(i.v/total*100,1)} % du total`;
+  });
+  barres(document.getElementById("g-legumes"), items, css("--s1"));
+  const mesure = {ht:"chiffre d'affaires", kg:"volume au kilo", p:"volume à la pièce"}[mesureLeg];
+  document.getElementById("sous-legumes").textContent =
+    items.length ? `Les ${items.length} premiers légumes par ${mesure}.` : "Aucune donnée.";
+}
+
+function graphClients(){
+  const m = new Map();
+  for (const c of clientsFiltres()){
+    if (!m.has(c.code_client)) m.set(c.code_client,{nom:c.client,ht:0,factures:0});
+    const v = m.get(c.code_client); v.ht += c.ht; v.factures += c.factures;
+  }
+  const total = [...m.values()].reduce((a,v)=>a+v.ht,0) || 1;
+  const items = [...m.values()].filter(v=>v.ht>0).map(v=>({nom:v.nom, v:v.ht,
+      txt:eur(v.ht),
+      detail:`${nb(v.ht/total*100,1)} % du chiffre d'affaires<br>${nb(v.factures)} factures`}))
+    .sort((a,b)=>b.v-a.v);
+  barres(document.getElementById("g-clients"), items, css("--s1"));
+  const top3 = items.slice(0,3).reduce((a,i)=>a+i.v,0);
+  document.getElementById("sous-clients").textContent = items.length
+    ? `${items.length} clients facturés. Les trois premiers pèsent ${nb(top3/total*100)} % du chiffre d'affaires.`
+    : "";
+}
+
+/* ---------- saisonnalite ---------- */
+const PALIERS = [0,.04,.08,.13,.19,.26,.34];
+function graphSaison(){
+  const rows = lignesFiltrees();
+  const tot = new Map();
+  rows.forEach(r => tot.set(r.famille, (tot.get(r.famille)||0) + r.ht));
+  const ordre = [...tot.entries()].filter(([,v])=>v>0)
+    .sort((a,b)=>b[1]-a[1]).slice(0,14).map(([f])=>f);
+  const lab = 118, cw = 40, ch = 26, T = 20;
+  const W = lab + cw*12 + 8, H = T + ordre.length*ch + 6;
+  const steps = ["--seq-100","--seq-200","--seq-300","--seq-400","--seq-500","--seq-600","--seq-700"].map(css);
+  const g = s("svg",{viewBox:`0 0 ${W} ${H}`,role:"img",style:`min-width:${W}px`,
+    "aria-label":"Répartition mensuelle des ventes par famille"});
+  MOIS.forEach((m,i)=>g.append(s("text",{x:lab+cw*i+cw/2,y:12,"text-anchor":"middle",
+    fill:css("--muted"),"font-size":11}, m.replace(".",""))));
+  ordre.forEach((f,r)=>{
+    const yy = T + r*ch;
+    const t = tot.get(f) || 1;
+    g.append(s("text",{x:0,y:yy+ch/2+4,fill:css("--ink-2"),"font-size":12.5}, couper(f, lab-8)));
+    for (let i=0;i<12;i++){
+      const v = rows.filter(x=>x.famille===f && x.mois==i+1).reduce((a,x)=>a+x.ht,0);
+      const part = v/t;
+      let k = -1;
+      if (v > 0){ k = 0; while (k < 6 && part >= PALIERS[k+1]) k++; }
+      const c = s("rect",{x:lab+cw*i+1,y:yy+1,width:cw-3,height:ch-3,rx:3,
+        fill: k<0 ? "transparent" : steps[k],
+        stroke: k<0 ? css("--grid") : "none", "stroke-width":1});
+      if (v>0) survol(c, f+" — "+MOIS_LONGS[i],
+        eur(v)+"<br>"+nb(part*100,1)+" % des ventes de cette famille");
+      g.append(c);
+    }
+  });
+  document.getElementById("g-saison").replaceChildren(g);
+
+  const lgs = el("div",{class:"echelle"}, "part du mois :", el("span",{},"faible"));
+  steps.forEach(c=>lgs.append(el("i",{style:"background:"+c})));
+  lgs.append("forte");
+  document.getElementById("lg-saison").replaceChildren(lgs,
+    el("p",{class:"mini"},
+      "Case vide : aucune vente ce mois-là. Le mois est celui de la facture, généralement émise en fin de mois de livraison."));
+}
+
+/* ---------- tableaux ---------- */
+function tableau(cible, colonnes, lignes, totaux){
+  const t = document.getElementById(cible);
+  const thead = el("thead",{}, el("tr",{}, colonnes.map((c,i)=>{
+    const th = el("th",{scope:"col"}, c.t);
+    th.addEventListener("click",()=>{
+      const asc = t.dataset.tri == i+"a";
+      lignes.sort((a,b)=>{const x=a[i],y=b[i];
+        if (typeof x==="number" && typeof y==="number") return asc?x-y:y-x;
+        return asc?String(x).localeCompare(y,"fr"):String(y).localeCompare(x,"fr");});
+      t.dataset.tri = i+(asc?"d":"a");
+      rendreCorps();
+    });
+    return th;
+  })));
+  const tbody = el("tbody");
+  const cellule = contenu => el(
+    "td",{},contenu instanceof Node ? contenu : String(contenu ?? "")
+  );
+  function rendreCorps(){
+    tbody.replaceChildren(...lignes.map(l=>el("tr",{},
+      l.map((v,i)=>cellule(colonnes[i].f ? colonnes[i].f(v) : v)))));
+  }
+  rendreCorps();
+  const parts = [thead, tbody];
+  if (totaux) parts.push(el("tfoot",{}, el("tr",{}, totaux.map((v,i)=>
+    cellule(colonnes[i].f && typeof v==="number" ? colonnes[i].f(v) : v)))));
+  t.replaceChildren(...parts);
+}
+
+function tableauLegumes(){
+  const rows = lignesFiltrees();
+  const m = cumul(rows, "legume", ["ht","kg","p"]);
+  const fam = new Map(rows.map(r=>[r.legume, r.famille]));
+  const total = [...m.values()].reduce((a,v)=>a+v.ht,0) || 1;
+  const lignes = [...m.entries()].map(([leg,v])=>[leg, fam.get(leg)||"", v.ht, v.kg, v.p, v.ht/total*100])
+    .sort((a,b)=>b[2]-a[2]);
+  tableau("t-legumes",
+    [{t:"Légume"},{t:"Famille"},{t:"CA HT",f:eur},{t:"kg",f:v=>nb(v)},
+     {t:"pièces",f:v=>nb(v)},{t:"part",f:v=>nb(v,1)+" %"}],
+    lignes,
+    ["Total","", lignes.reduce((a,l)=>a+l[2],0), lignes.reduce((a,l)=>a+l[3],0),
+     lignes.reduce((a,l)=>a+l[4],0), 100]);
+}
+
+function tableauClients(){
+  const ans = D.meta.annees;
+  const par = new Map();
+  for (const c of D.clients){
+    if (!par.has(c.code_client)) par.set(c.code_client, {nom:c.client,annee:{}});
+    const o = par.get(c.code_client);
+    o.annee[c.annee] = (o.annee[c.annee]||0) + c.ht;
+  }
+  const recente = ans[ans.length-1], precedente = ans[ans.length-2];
+  const m = borneMois(recente);
+  // Comparaison a periode equivalente : seuls les mois couverts par l'annee
+  // la plus recente sont retenus des deux cotes.
+  const borne = new Map();
+  for (const c of D.clients){
+    if (c.mois <= m && (c.annee==recente || c.annee==precedente)){
+      if (!borne.has(c.code_client)) borne.set(c.code_client,{});
+      const valeurs = borne.get(c.code_client);
+      valeurs[c.annee] = (valeurs[c.annee]||0) + c.ht;
+    }
+  }
+
+  const lignes = [...par.entries()].map(([code,o])=>{
+    const l = [o.nom, ...ans.map(a=>o.annee[a]||0)];
+    const b = borne.get(code) || {};
+    const d = b[recente] || 0, p = b[precedente] || 0;
+    const totalPrec = o.annee[precedente] || 0;
+    if (ans.length < 2)                       l.push("");
+    else if (totalPrec === 0 && d > 0)        l.push("aucune vente en "+precedente);
+    else if (p === 0 && d > 0)                l.push("rien sur cette période en "+precedente);
+    else if (p > 0 && d === 0)                l.push("plus de vente");
+    else if (p === 0 && d === 0)              l.push("aucune vente");
+    else                                      l.push((d-p)/p*100);
+    return l;
+  }).sort((a,b)=>{
+    const s = x=>x.slice(1,1+ans.length).reduce((u,v)=>u+v,0);
+    return s(b)-s(a);
+  });
+
+  const evo = v => typeof v!=="number" ? el("span",{class:"mini"},v)
+    : el("span",{class:v>=0?"up":"down"},`${v>=0?"+":""}${nb(v,0)} %`);
+  tableau("t-clients",
+    [{t:"Client"}, ...ans.map(a=>({t:String(a),f:eur})),
+     {t: ans.length>1 ? `${recente} vs ${precedente}` : "évolution", f:evo}],
+    lignes,
+    ["Total", ...ans.map(a=>lignes.reduce((s,l)=>s+l[1+ans.indexOf(a)],0)), ""]);
+
+  document.getElementById("sous-t-clients").textContent =
+    ans.length>1 && m<12
+      ? `Chiffre d'affaires par année. La colonne d'évolution compare ${recente} et ${precedente} sur la même période${libellePeriode(recente)}, sans quoi une année en cours paraîtrait toujours en chute.`
+      : "Chiffre d'affaires par année et évolution.";
+}
+
+/* ---------- controle ---------- */
+function controle(){
+  const c = D.controle;
+  const pc = c.ca_total ? c.ca_non_identifie/c.ca_total*100 : 0;
+  const fort = texte => el("b",{},String(texte));
+  const paragraphe = (...contenu) => el("p",{},...contenu);
+  const noeuds = [
+    paragraphe(fort(c.fichiers_vus)," fichiers PDF vus, ",fort(c.factures_lues),
+      " lus, ",fort(c.factures_integrees)," retenus dans ces chiffres."),
+    paragraphe(
+      "Une facture n'entre dans les totaux que si son Total HT et le calcul de chaque ligne sont cohérents. ",
+      c.factures_rejetees.length
+        ? fort(c.factures_rejetees.length+" facture(s) ont été écartées à ce titre.")
+        : `Les ${c.factures_integrees} factures retenues vérifient ces contrôles.`
+    )
+  ];
+  const ajouterListe = (titre, lignes) => {
+    if (!lignes.length) return;
+    noeuds.push(paragraphe(fort(titre)," :"));
+    noeuds.push(el("ul",{},...lignes.map(d=>
+      el("li",{},String(d[0])," — ",String(d[1])))));
+  };
+  ajouterListe("Doublons détectés (comptés une seule fois)",c.doublons);
+  ajouterListe("Conflits de numéro (aucun exemplaire compté)",c.conflits);
+  ajouterListe("Factures écartées",c.factures_rejetees);
+  ajouterListe("Fichiers illisibles",c.erreurs_lecture);
+  ajouterListe("Lignes d'arbitrage ignorées",c.erreurs_arbitrage);
+  noeuds.push(paragraphe(
+    fort("Lignes non identifiées"),
+    ` : ${c.lignes_non_identifiees} lignes, ${eur(c.ca_non_identifie)} (${nb(pc,1)} % du chiffre d'affaires). `,
+    "Elles restent sous l'étiquette « Non identifié » et peuvent être attribuées dans ",
+    el("code",{},"arbitrage.csv"),"."
+  ));
+  noeuds.push(paragraphe(
+    fort("Ce que ces chiffres ne disent pas."),
+    " Les factures ne contiennent aucun prix d'achat ni coût de production. Ce rapport mesure les ventes, pas la marge."
+  ));
+  noeuds.push(paragraphe(
+    fort("Volumes."),
+    " Les quantités au kilo et à la pièce restent séparées. Une unité manquante n'est déduite que des ventes identifiées du même légume."
+  ));
+  noeuds.push(paragraphe(
+    fort("Dates."),
+    " L'année et le mois viennent de la date d'émission, jamais du numéro de facture ni du dossier."
+  ));
+  document.getElementById("controle-corps").replaceChildren(...noeuds);
+}
+
+/* ---------- assemblage ---------- */
+function tout(){ tuiles(); graphMois(); graphLegumes(); graphClients(); graphSaison();
+                 tableauLegumes(); tableauClients(); }
+
+function init(){
+  document.getElementById("periode").textContent =
+    `${D.meta.libelle_periode} · ${D.controle.factures_integrees} factures · ${eur(D.meta.ca_total)} HT`;
+
+  if (D.meta.incompletes.length){
+    const derniere = D.meta.incompletes[D.meta.incompletes.length-1];
+    document.getElementById("avis").replaceChildren(el("p",{class:"avis"},
+      `Année ${D.meta.incompletes.join(", ")} incomplète : la dernière facture connue date du `,
+      `${derniereFacture(derniere)}. Les évolutions comparent les mêmes mois, mais les totaux annuels bruts ne sont pas comparables.`));
+  }
+
+  const f = document.getElementById("filtres");
+  const choix = [["tout","Toutes"], ...D.meta.annees.map(a=>[String(a),String(a)])];
+  choix.forEach(([v,t])=>{
+    const b = el("button",{type:"button","aria-pressed":String(v===annee)}, t);
+    b.addEventListener("click",()=>{
+      annee = v;
+      [...f.children].forEach(x=>x.setAttribute("aria-pressed", String(x===b)));
+      tout();
+    });
+    f.append(b);
+  });
+
+  document.querySelectorAll("#bascule-leg button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      mesureLeg = b.dataset.mesure;
+      document.querySelectorAll("#bascule-leg button").forEach(x=>
+        x.setAttribute("aria-pressed", String(x===b)));
+      graphLegumes();
+    });
+  });
+
+  controle();
+  tout();
+  document.getElementById("pied").textContent =
+    "Rapport généré le "+D.meta.genere_le+" à partir des factures PDF. Aucune saisie manuelle.";
+}
+
+let minuteur;
+addEventListener("resize",()=>{clearTimeout(minuteur);minuteur=setTimeout(tout,180);});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",tout);
+init();
+</script>
+</body>
+</html>

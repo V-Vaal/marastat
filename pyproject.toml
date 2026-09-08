@@ -1,0 +1,44 @@
+[project]
+name = "marastat"
+version = "1.0.0"
+description = "Des factures PDF au rapport de ventes, sans ressaisie."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Valentin Valluet" }]
+keywords = ["pdf", "facture", "etl", "sqlite", "rapport", "maraichage"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Office/Business :: Financial :: Accounting",
+    "Natural Language :: French",
+]
+dependencies = ["pdfplumber==0.11.10"]
+
+[project.optional-dependencies]
+# Uniquement pour fabriquer le jeu de factures de demonstration et lancer la
+# suite de tests. L'outil lui-meme n'a besoin que de pdfplumber.
+dev = ["pytest==8.4.2", "reportlab>=4.0", "ruff>=0.6"]
+
+[project.urls]
+Source = "https://github.com/V-Vaal/marastat"
+
+[project.scripts]
+marastat = "marastat.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["marastat"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "FURB", "RUF"]

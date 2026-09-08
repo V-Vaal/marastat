@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marastat — rapport de ventes</title>
+<style>
+:root{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --bord:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --seq-100:#cde2fb; --seq-200:#9ec5f4; --seq-300:#6da7ec;
+  --seq-400:#3987e5; --seq-500:#256abf; --seq-600:#184f95; --seq-700:#0d366b;
+  --good:#006300; --bad:#d03b3b; --warn:#fab219;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --bord:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --seq-100:#0d366b; --seq-200:#184f95; --seq-300:#256abf;
+    --seq-400:#3987e5; --seq-500:#6da7ec; --seq-600:#9ec5f4; --seq-700:#cde2fb;
+    --good:#0ca30c; --bad:#e66767;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0d0d0d; --surface:#1a1a19;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --bord:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --seq-100:#0d366b; --seq-200:#184f95; --seq-300:#256abf;
+  --seq-400:#3987e5; --seq-500:#6da7ec; --seq-600:#9ec5f4; --seq-700:#cde2fb;
+  --good:#0ca30c; --bad:#e66767;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 64px}
+header h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
+header p{margin:0;color:var(--ink-2);font-size:14px}
+.avis{margin:16px 0 0;padding:11px 13px;border-radius:10px;
+  background:color-mix(in srgb,var(--warn) 14%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);
+  font-size:13.5px;color:var(--ink)}
+.filtres{position:sticky;top:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;
+  margin:20px 0 18px;padding:10px 0;background:var(--plane)}
+.filtres button{font:inherit;font-size:14px;padding:7px 14px;border-radius:999px;
+  border:1px solid var(--bord);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.filtres button[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:600}
+section{margin:0 0 30px}
+h2{font-size:16px;margin:0 0 3px;letter-spacing:-.005em}
+.sous{margin:0 0 14px;color:var(--muted);font-size:13px}
+.carte{background:var(--surface);border:1px solid var(--bord);border-radius:12px;padding:14px}
+.tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:10px}
+.tuile{background:var(--surface);border:1px solid var(--bord);border-radius:12px;padding:13px 14px}
+.tuile .lab{font-size:12.5px;color:var(--muted);margin-bottom:3px}
+.tuile .val{font-size:26px;font-weight:650;letter-spacing:-.02em;line-height:1.15}
+.tuile .sub{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.up{color:var(--good)} .down{color:var(--bad)}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.lg{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 10px;font-size:13px;color:var(--ink-2)}
+.lg span{display:inline-flex;align-items:center;gap:6px}
+.pastille{width:11px;height:11px;border-radius:3px;flex:none}
+.echelle{display:flex;align-items:center;gap:7px;margin:10px 0 0;font-size:12px;color:var(--muted)}
+.echelle i{width:22px;height:11px;border-radius:2px;display:inline-block}
+.defil{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th:first-child,td:first-child{text-align:left;white-space:normal;min-width:132px}
+thead th{color:var(--muted);font-weight:600;font-size:12.5px;cursor:pointer;
+  position:sticky;top:0;background:var(--surface)}
+thead th:hover{color:var(--ink)}
+tbody tr:last-child td{border-bottom:none}
+tfoot td{font-weight:650;border-top:2px solid var(--axis);border-bottom:none}
+.bulle{position:fixed;pointer-events:none;z-index:50;opacity:0;transition:opacity .09s;
+  background:var(--surface);border:1px solid var(--bord);border-radius:9px;
+  padding:7px 10px;font-size:13px;box-shadow:0 6px 22px rgba(0,0,0,.16);max-width:240px}
+.bulle b{display:block;margin-bottom:2px}
+details{background:var(--surface);border:1px solid var(--bord);border-radius:12px;padding:12px 14px}
+summary{cursor:pointer;font-weight:600;font-size:14.5px}
+details p,details li{font-size:13.5px;color:var(--ink-2)}
+.mini{font-size:12.5px;color:var(--muted)}
+.bascule{display:inline-flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.bascule button{font:inherit;font-size:13px;padding:5px 11px;border-radius:8px;
+  border:1px solid var(--bord);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.bascule button[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff}
+footer{margin-top:34px;color:var(--muted);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Rapport de ventes</h1>
+  <p id="periode"></p>
+</header>
+<div id="avis"></div>
+
+<div class="filtres" id="filtres" role="group" aria-label="Filtrer par année"></div>
+
+<section>
+  <h2>Vue d'ensemble</h2>
+  <p class="sous" id="sous-tuiles"></p>
+  <div class="tuiles" id="tuiles"></div>
+</section>
+
+<section>
+  <h2>Chiffre d'affaires mois par mois</h2>
+  <p class="sous">Montants hors taxes, par mois de facturation.</p>
+  <div class="carte">
+    <div class="lg" id="lg-mois"></div>
+    <div id="g-mois"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Légumes</h2>
+  <p class="sous" id="sous-legumes"></p>
+  <div class="carte">
+    <div class="bascule" id="bascule-leg" role="group" aria-label="Mesure">
+      <button data-mesure="ht" aria-pressed="true">Chiffre d'affaires</button>
+      <button data-mesure="kg" aria-pressed="false">Volume (kg)</button>
+      <button data-mesure="p" aria-pressed="false">Volume (pièces)</button>
+    </div>
+    <div id="g-legumes"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Détail par légume</h2>
+  <p class="sous">Cliquer sur un en-tête pour trier.</p>
+  <div class="carte defil"><table id="t-legumes"></table></div>
+</section>
+
+<section>
+  <h2>Saisonnalité</h2>
+  <p class="sous">Répartition du chiffre d'affaires de chaque famille au fil des mois. Plus la case est foncée, plus le mois pèse dans les ventes de cette famille.</p>
+  <div class="carte"><div class="defil" id="g-saison"></div><div id="lg-saison"></div></div>
+</section>
+
+<section>
+  <h2>Clients</h2>
+  <p class="sous" id="sous-clients"></p>
+  <div class="carte"><div id="g-clients"></div></div>
+</section>
+
+<section>
+  <h2>Détail par client</h2>
+  <p class="sous" id="sous-t-clients">Chiffre d'affaires par année et évolution.</p>
+  <div class="carte defil"><table id="t-clients"></table></div>
+</section>
+
+<section>
+  <h2>Contrôle des données</h2>
+  <p class="sous">À lire avant d'utiliser ces chiffres ailleurs.</p>
+  <details id="controle"><summary>Comment ces chiffres ont été obtenus</summary><div id="controle-corps"></div></details>
+</section>
+
+<footer id="pied"></footer>
+</div>
+<div class="bulle" id="bulle" role="status" aria-live="polite"></div>
+
+<script id="donnees" type="application/json">/*__DONNEES__*/</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById("donnees").textContent);
+const MOIS = D.meta.mois_courts;
+const MOIS_LONGS = D.meta.mois_longs;
+const SVGNS = "http://www.w3.org/2000/svg";
+let annee = "tout";
+
+const eur = n => new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Math.round(n))+" €";
+const nb  = (n,d=0) => new Intl.NumberFormat("fr-FR",{maximumFractionDigits:d}).format(n);
+const el  = (t,a={},...k)=>{const e=document.createElement(t);
+  for(const[c,v]of Object.entries(a)){if(c==="class")e.className=v;else e.setAttribute(c,v);}
+  k.flat().forEach(x=>e.append(x)); return e;};
+const s = (t,a={},...k)=>{const e=document.createElementNS(SVGNS,t);
+  for(const[c,v]of Object.entries(a))e.setAttribute(c,v);
+  k.flat().forEach(x=>e.append(x)); return e;};
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+/* Un SVG ne sait pas couper un texte trop long : on le fait a la main, en
+   gardant le nom entier dans l'infobulle. */
+const couper = (txt, largeur, taille=12.5) => {
+  const max = Math.max(3, Math.floor(largeur / (taille*0.52)));
+  return txt.length <= max ? txt : txt.slice(0, max-1).trimEnd()+"…";
+};
+
+/* ---------- infobulle ---------- */
+const bulle = document.getElementById("bulle");
+function montrer(ev, titre, corps){
+  const contenu = [el("b",{},String(titre))];
+  String(corps).split("<br>").forEach((ligne,i)=>{
+    if(i) contenu.push(el("br"));
+    contenu.push(ligne);
+  });
+  bulle.replaceChildren(...contenu);
+  bulle.style.opacity = 1;
+  const r = bulle.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY - r.height - 12;
+  if (x + r.width > innerWidth - 8) x = innerWidth - r.width - 8;
+  if (y < 8) y = ev.clientY + 18;
+  bulle.style.left = x+"px"; bulle.style.top = y+"px";
+}
+const cacher = () => bulle.style.opacity = 0;
+function survol(noeud, titre, corps){
+  noeud.style.cursor = "pointer";
+  noeud.addEventListener("pointerenter", e => montrer(e, titre, corps));
+  noeud.addEventListener("pointermove",  e => montrer(e, titre, corps));
+  noeud.addEventListener("pointerleave", cacher);
+  noeud.addEventListener("pointerdown",  e => montrer(e, titre, corps));
+}
+addEventListener("scroll", cacher, {passive:true});
+
+/* ---------- selection et periode comparable ---------- */
+function lignesFiltrees(){
+  return annee === "tout" ? D.legumes : D.legumes.filter(l => l.annee == annee);
+}
+function clientsFiltres(){
+  return annee === "tout" ? D.clients : D.clients.filter(c => c.annee == annee);
+}
+function cumul(rows, cle, champs){
+  const m = new Map();
+  for (const r of rows){
+    const k = r[cle];
+    if (!m.has(k)) m.set(k, Object.fromEntries(champs.map(c=>[c,0])));
+    const o = m.get(k);
+    for (const c of champs) o[c] += r[c] || 0;
+  }
+  return m;
+}
+const incomplete = an => D.meta.incompletes.includes(Number(an));
+const derniereFacture = an =>
+  D.meta.derniere_facture_par_annee[String(an)] || D.meta.derniere_facture;
+/* Derniere annee couverte : elle sert de reference pour les comparaisons. */
+const derniereAnnee = D.meta.annees[D.meta.annees.length-1];
+/* Comparer une annee en cours a une annee pleine fausse tout : on borne la
+   comparaison aux mois reellement couverts par la plus recente des deux. */
+function borneMois(an){
+  return incomplete(an) ? (D.meta.dernier_mois[String(an)] || 12) : 12;
+}
+function libellePeriode(an){
+  const m = borneMois(an);
+  return m >= 12 ? "" : ` (${MOIS[0]}–${MOIS[m-1]})`;
+}
+
+/* ---------- tuiles ---------- */
+function tuiles(){
+  const rows = lignesFiltrees();
+  const ht = rows.reduce((a,r)=>a+r.ht,0);
+  const kg = rows.reduce((a,r)=>a+r.kg,0);
+  const pc = rows.reduce((a,r)=>a+r.p,0);
+  const fa = annee==="tout" ? D.factures.reduce((a,f)=>a+f.nb,0)
+                            : (D.factures.find(f=>f.annee==annee)||{nb:0}).nb;
+  const cl = new Set(clientsFiltres().map(c=>c.code_client)).size;
+
+  let evol = "";
+  if (annee === "tout"){
+    evol = D.meta.annees.length + " années couvertes";
+  } else {
+    const m = borneMois(annee);
+    const cetteAnnee = D.legumes.filter(l=>l.annee==annee && l.mois<=m).reduce((a,r)=>a+r.ht,0);
+    const anPrec = D.legumes.filter(l=>l.annee==annee-1 && l.mois<=m).reduce((a,r)=>a+r.ht,0);
+    if (anPrec > 0){
+      const d = (cetteAnnee-anPrec)/anPrec*100;
+      evol = el("span",{},
+        el("span",{class:d>=0?"up":"down"},`${d>=0?"+":""}${nb(d,1)} %`),
+        ` vs ${annee-1}${libellePeriode(annee)}`);
+    } else {
+      evol = "pas de comparaison possible";
+    }
+  }
+
+  const t = document.getElementById("tuiles");
+  t.replaceChildren(
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Chiffre d'affaires HT"),
+        el("div",{class:"val"},eur(ht)), el("div",{class:"sub"},evol)),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Factures"),
+        el("div",{class:"val"},nb(fa)), el("div",{class:"sub"}, fa? "panier moyen "+eur(ht/fa):"")),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Clients servis"),
+        el("div",{class:"val"},nb(cl)), el("div",{class:"sub"},"ayant reçu au moins une facture")),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Volume au kilo"),
+        el("div",{class:"val"},nb(kg)+" kg"), el("div",{class:"sub"},"vendu au poids")),
+    el("div",{class:"tuile"}, el("div",{class:"lab"},"Volume à la pièce"),
+        el("div",{class:"val"},nb(pc)), el("div",{class:"sub"},"pièces ou bottes"))
+  );
+  document.getElementById("sous-tuiles").textContent =
+    annee==="tout" ? "Toutes années confondues."
+                   : "Année "+annee+(incomplete(annee)?", arrêtée au "+derniereFacture(annee)+"." : ".");
+}
+
+/* ---------- CA mensuel ---------- */
+function graphMois(){
+  const box = document.getElementById("g-mois");
+  const L = 46, R = 14, H = 232, T = 12, B = 26;
+  const W = Math.max(box.clientWidth || 640, 320);
+  const pw = W-L-R, ph = H-T-B;
+  const cols = [css("--s1"), css("--s2"), css("--s3")];
+  const max = Math.max(...D.mensuel.map(m=>m.ht), 1);
+  const ymax = Math.ceil(max/1000)*1000 || 1000;
+  const x = i => L + (pw*i)/11;
+  const y = v => T + ph - (v/ymax)*ph;
+
+  const g = s("svg",{viewBox:`0 0 ${W} ${H}`,role:"img",
+    "aria-label":"Chiffre d'affaires par mois et par année"});
+  for (let i=0;i<=4;i++){
+    const v = ymax*i/4;
+    g.append(s("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css("--grid"),"stroke-width":1}));
+    g.append(s("text",{x:L-8,y:y(v)+4,"text-anchor":"end",fill:css("--muted"),"font-size":11},
+      String(Math.round(v/1000))+"k"));
+  }
+  // Sur un ecran etroit, douze libelles de mois se chevauchent : on n'en
+  // garde qu'un sur deux, les points restant survolables un par un.
+  const pas = pw < 330 ? 2 : 1;
+  MOIS.forEach((m,i)=>{ if (i % pas) return;
+    g.append(s("text",{x:x(i),y:H-8,"text-anchor":"middle",
+      fill:css("--muted"),"font-size":11}, m.replace(".","")));});
+
+  D.meta.annees.forEach((an,k)=>{
+    const pts = MOIS.map((_,i)=>{
+      const r = D.mensuel.find(m=>m.annee==an && m.mois==i+1);
+      return r ? [x(i), y(r.ht), r.ht] : null;
+    });
+    const actif = annee==="tout" || annee==an;
+    const coul = actif ? cols[k%3] : css("--grid");
+    let d = "", ouvert = false;
+    pts.forEach(p=>{ if(!p){ouvert=false;return;} d += (ouvert?" L":" M")+p[0]+" "+p[1]; ouvert=true; });
+    g.append(s("path",{d,fill:"none",stroke:coul,"stroke-width":2,
+      "stroke-linecap":"round","stroke-linejoin":"round",opacity:actif?1:.5}));
+    if (!actif) return;
+    pts.forEach((p,i)=>{ if(!p) return;
+      g.append(s("circle",{cx:p[0],cy:p[1],r:4.5,fill:coul,stroke:css("--surface"),"stroke-width":2}));
+      const zone = s("circle",{cx:p[0],cy:p[1],r:15,fill:"transparent"});
+      survol(zone, an+" — "+MOIS_LONGS[i], eur(p[2])); g.append(zone);
+    });
+  });
+  box.replaceChildren(g);
+
+  const lg = document.getElementById("lg-mois");
+  lg.replaceChildren(...D.meta.annees.map((an,k)=>{
+    const actif = annee==="tout" || annee==an;
+    return el("span",{}, el("i",{class:"pastille",
+      style:"background:"+(actif?cols[k%3]:css("--grid"))}), String(an));
+  }));
+}
+
+/* ---------- barres horizontales ---------- */
+function barres(box, items, coul){
+  const W = Math.max(box.clientWidth || 640, 320);
+  const lab = Math.min(190, Math.round(W*0.34));
+  const hb = 18, ecart = 11, T = 4;
+  const H = T + items.length*(hb+ecart);
+  const max = Math.max(...items.map(i=>i.v), 1);
+  const pw = W - lab - 70;
+  const g = s("svg",{viewBox:`0 0 ${W} ${H}`,role:"img"});
+  items.forEach((it,i)=>{
+    const yy = T + i*(hb+ecart);
+    const l = Math.max((it.v/max)*pw, 2);
+    g.append(s("text",{x:0,y:yy+hb/2+4,fill:css("--ink-2"),"font-size":12.5},
+      couper(it.nom, lab-8)));
+    g.append(s("rect",{x:lab,y:yy,width:l,height:hb,rx:4,fill:coul}));
+    g.append(s("text",{x:lab+l+7,y:yy+hb/2+4,fill:css("--ink-2"),"font-size":12,
+      "font-variant-numeric":"tabular-nums"}, it.txt));
+    const z = s("rect",{x:0,y:yy-4,width:W,height:hb+8,fill:"transparent"});
+    survol(z, it.nom, it.detail); g.append(z);
+  });
+  box.replaceChildren(g);
+}
+
+let mesureLeg = "ht";
+function graphLegumes(){
+  const m = cumul(lignesFiltrees(), "legume", ["ht","kg","p"]);
+  const items = [...m.entries()]
+    .map(([nom,v])=>({nom, v:v[mesureLeg], ht:v.ht, kg:v.kg, p:v.p}))
+    .filter(i=>i.v>0).sort((a,b)=>b.v-a.v).slice(0,14);
+  const total = [...m.values()].reduce((a,v)=>a+v[mesureLeg],0) || 1;
+  items.forEach(i=>{
+    i.txt = mesureLeg==="ht" ? eur(i.v) : nb(i.v)+(mesureLeg==="kg"?" kg":"");
+    i.detail = `${eur(i.ht)} · ${nb(i.kg)} kg · ${nb(i.p)} pièces<br>${nb(i.v/total*100,1)} % du total`;
+  });
+  barres(document.getElementById("g-legumes"), items, css("--s1"));
+  const mesure = {ht:"chiffre d'affaires", kg:"volume au kilo", p:"volume à la pièce"}[mesureLeg];
+  document.getElementById("sous-legumes").textContent =
+    items.length ? `Les ${items.length} premiers légumes par ${mesure}.` : "Aucune donnée.";
+}
+
+function graphClients(){
+  const m = new Map();
+  for (const c of clientsFiltres()){
+    if (!m.has(c.code_client)) m.set(c.code_client,{nom:c.client,ht:0,factures:0});
+    const v = m.get(c.code_client); v.ht += c.ht; v.factures += c.factures;
+  }
+  const total = [...m.values()].reduce((a,v)=>a+v.ht,0) || 1;
+  const items = [...m.values()].filter(v=>v.ht>0).map(v=>({nom:v.nom, v:v.ht,
+      txt:eur(v.ht),
+      detail:`${nb(v.ht/total*100,1)} % du chiffre d'affaires<br>${nb(v.factures)} factures`}))
+    .sort((a,b)=>b.v-a.v);
+  barres(document.getElementById("g-clients"), items, css("--s1"));
+  const top3 = items.slice(0,3).reduce((a,i)=>a+i.v,0);
+  document.getElementById("sous-clients").textContent = items.length
+    ? `${items.length} clients facturés. Les trois premiers pèsent ${nb(top3/total*100)} % du chiffre d'affaires.`
+    : "";
+}
+
+/* ---------- saisonnalite ---------- */
+const PALIERS = [0,.04,.08,.13,.19,.26,.34];
+function graphSaison(){
+  const rows = lignesFiltrees();
+  const tot = new Map();
+  rows.forEach(r => tot.set(r.famille, (tot.get(r.famille)||0) + r.ht));
+  const ordre = [...tot.entries()].filter(([,v])=>v>0)
+    .sort((a,b)=>b[1]-a[1]).slice(0,14).map(([f])=>f);
+  const lab = 118, cw = 40, ch = 26, T = 20;
+  const W = lab + cw*12 + 8, H = T + ordre.length*ch + 6;
+  const steps = ["--seq-100","--seq-200","--seq-300","--seq-400","--seq-500","--seq-600","--seq-700"].map(css);
+  const g = s("svg",{viewBox:`0 0 ${W} ${H}`,role:"img",style:`min-width:${W}px`,
+    "aria-label":"Répartition mensuelle des ventes par famille"});
+  MOIS.forEach((m,i)=>g.append(s("text",{x:lab+cw*i+cw/2,y:12,"text-anchor":"middle",
+    fill:css("--muted"),"font-size":11}, m.replace(".",""))));
+  ordre.forEach((f,r)=>{
+    const yy = T + r*ch;
+    const t = tot.get(f) || 1;
+    g.append(s("text",{x:0,y:yy+ch/2+4,fill:css("--ink-2"),"font-size":12.5}, couper(f, lab-8)));
+    for (let i=0;i<12;i++){
+      const v = rows.filter(x=>x.famille===f && x.mois==i+1).reduce((a,x)=>a+x.ht,0);
+      const part = v/t;
+      let k = -1;
+      if (v > 0){ k = 0; while (k < 6 && part >= PALIERS[k+1]) k++; }
+      const c = s("rect",{x:lab+cw*i+1,y:yy+1,width:cw-3,height:ch-3,rx:3,
+        fill: k<0 ? "transparent" : steps[k],
+        stroke: k<0 ? css("--grid") : "none", "stroke-width":1});
+      if (v>0) survol(c, f+" — "+MOIS_LONGS[i],
+        eur(v)+"<br>"+nb(part*100,1)+" % des ventes de cette famille");
+      g.append(c);
+    }
+  });
+  document.getElementById("g-saison").replaceChildren(g);
+
+  const lgs = el("div",{class:"echelle"}, "part du mois :", el("span",{},"faible"));
+  steps.forEach(c=>lgs.append(el("i",{style:"background:"+c})));
+  lgs.append("forte");
+  document.getElementById("lg-saison").replaceChildren(lgs,
+    el("p",{class:"mini"},
+      "Case vide : aucune vente ce mois-là. Le mois est celui de la facture, généralement émise en fin de mois de livraison."));
+}
+
+/* ---------- tableaux ---------- */
+function tableau(cible, colonnes, lignes, totaux){
+  const t = document.getElementById(cible);
+  const thead = el("thead",{}, el("tr",{}, colonnes.map((c,i)=>{
+    const th = el("th",{scope:"col"}, c.t);
+    th.addEventListener("click",()=>{
+      const asc = t.dataset.tri == i+"a";
+      lignes.sort((a,b)=>{const x=a[i],y=b[i];
+        if (typeof x==="number" && typeof y==="number") return asc?x-y:y-x;
+        return asc?String(x).localeCompare(y,"fr"):String(y).localeCompare(x,"fr");});
+      t.dataset.tri = i+(asc?"d":"a");
+      rendreCorps();
+    });
+    return th;
+  })));
+  const tbody = el("tbody");
+  const cellule = contenu => el(
+    "td",{},contenu instanceof Node ? contenu : String(contenu ?? "")
+  );
+  function rendreCorps(){
+    tbody.replaceChildren(...lignes.map(l=>el("tr",{},
+      l.map((v,i)=>cellule(colonnes[i].f ? colonnes[i].f(v) : v)))));
+  }
+  rendreCorps();
+  const parts = [thead, tbody];
+  if (totaux) parts.push(el("tfoot",{}, el("tr",{}, totaux.map((v,i)=>
+    cellule(colonnes[i].f && typeof v==="number" ? colonnes[i].f(v) : v)))));
+  t.replaceChildren(...parts);
+}
+
+function tableauLegumes(){
+  const rows = lignesFiltrees();
+  const m = cumul(rows, "legume", ["ht","kg","p"]);
+  const fam = new Map(rows.map(r=>[r.legume, r.famille]));
+  const total = [...m.values()].reduce((a,v)=>a+v.ht,0) || 1;
+  const lignes = [...m.entries()].map(([leg,v])=>[leg, fam.get(leg)||"", v.ht, v.kg, v.p, v.ht/total*100])
+    .sort((a,b)=>b[2]-a[2]);
+  tableau("t-legumes",
+    [{t:"Légume"},{t:"Famille"},{t:"CA HT",f:eur},{t:"kg",f:v=>nb(v)},
+     {t:"pièces",f:v=>nb(v)},{t:"part",f:v=>nb(v,1)+" %"}],
+    lignes,
+    ["Total","", lignes.reduce((a,l)=>a+l[2],0), lignes.reduce((a,l)=>a+l[3],0),
+     lignes.reduce((a,l)=>a+l[4],0), 100]);
+}
+
+function tableauClients(){
+  const ans = D.meta.annees;
+  const par = new Map();
+  for (const c of D.clients){
+    if (!par.has(c.code_client)) par.set(c.code_client, {nom:c.client,annee:{}});
+    const o = par.get(c.code_client);
+    o.annee[c.annee] = (o.annee[c.annee]||0) + c.ht;
+  }
+  const recente = ans[ans.length-1], precedente = ans[ans.length-2];
+  const m = borneMois(recente);
+  // Comparaison a periode equivalente : seuls les mois couverts par l'annee
+  // la plus recente sont retenus des deux cotes.
+  const borne = new Map();
+  for (const c of D.clients){
+    if (c.mois <= m && (c.annee==recente || c.annee==precedente)){
+      if (!borne.has(c.code_client)) borne.set(c.code_client,{});
+      const valeurs = borne.get(c.code_client);
+      valeurs[c.annee] = (valeurs[c.annee]||0) + c.ht;
+    }
+  }
+
+  const lignes = [...par.entries()].map(([code,o])=>{
+    const l = [o.nom, ...ans.map(a=>o.annee[a]||0)];
+    const b = borne.get(code) || {};
+    const d = b[recente] || 0, p = b[precedente] || 0;
+    const totalPrec = o.annee[precedente] || 0;
+    if (ans.length < 2)                       l.push("");
+    else if (totalPrec === 0 && d > 0)        l.push("aucune vente en "+precedente);
+    else if (p === 0 && d > 0)                l.push("rien sur cette période en "+precedente);
+    else if (p > 0 && d === 0)                l.push("plus de vente");
+    else if (p === 0 && d === 0)              l.push("aucune vente");
+    else                                      l.push((d-p)/p*100);
+    return l;
+  }).sort((a,b)=>{
+    const s = x=>x.slice(1,1+ans.length).reduce((u,v)=>u+v,0);
+    return s(b)-s(a);
+  });
+
+  const evo = v => typeof v!=="number" ? el("span",{class:"mini"},v)
+    : el("span",{class:v>=0?"up":"down"},`${v>=0?"+":""}${nb(v,0)} %`);
+  tableau("t-clients",
+    [{t:"Client"}, ...ans.map(a=>({t:String(a),f:eur})),
+     {t: ans.length>1 ? `${recente} vs ${precedente}` : "évolution", f:evo}],
+    lignes,
+    ["Total", ...ans.map(a=>lignes.reduce((s,l)=>s+l[1+ans.indexOf(a)],0)), ""]);
+
+  document.getElementById("sous-t-clients").textContent =
+    ans.length>1 && m<12
+      ? `Chiffre d'affaires par année. La colonne d'évolution compare ${recente} et ${precedente} sur la même période${libellePeriode(recente)}, sans quoi une année en cours paraîtrait toujours en chute.`
+      : "Chiffre d'affaires par année et évolution.";
+}
+
+/* ---------- controle ---------- */
+function controle(){
+  const c = D.controle;
+  const pc = c.ca_total ? c.ca_non_identifie/c.ca_total*100 : 0;
+  const fort = texte => el("b",{},String(texte));
+  const paragraphe = (...contenu) => el("p",{},...contenu);
+  const noeuds = [
+    paragraphe(fort(c.fichiers_vus)," fichiers PDF vus, ",fort(c.factures_lues),
+      " lus, ",fort(c.factures_integrees)," retenus dans ces chiffres."),
+    paragraphe(
+      "Une facture n'entre dans les totaux que si son Total HT et le calcul de chaque ligne sont cohérents. ",
+      c.factures_rejetees.length
+        ? fort(c.factures_rejetees.length+" facture(s) ont été écartées à ce titre.")
+        : `Les ${c.factures_integrees} factures retenues vérifient ces contrôles.`
+    )
+  ];
+  const ajouterListe = (titre, lignes) => {
+    if (!lignes.length) return;
+    noeuds.push(paragraphe(fort(titre)," :"));
+    noeuds.push(el("ul",{},...lignes.map(d=>
+      el("li",{},String(d[0])," — ",String(d[1])))));
+  };
+  ajouterListe("Doublons détectés (comptés une seule fois)",c.doublons);
+  ajouterListe("Conflits de numéro (aucun exemplaire compté)",c.conflits);
+  ajouterListe("Factures écartées",c.factures_rejetees);
+  ajouterListe("Fichiers illisibles",c.erreurs_lecture);
+  ajouterListe("Lignes d'arbitrage ignorées",c.erreurs_arbitrage);
+  noeuds.push(paragraphe(
+    fort("Lignes non identifiées"),
+    ` : ${c.lignes_non_identifiees} lignes, ${eur(c.ca_non_identifie)} (${nb(pc,1)} % du chiffre d'affaires). `,
+    "Elles restent sous l'étiquette « Non identifié » et peuvent être attribuées dans ",
+    el("code",{},"arbitrage.csv"),"."
+  ));
+  noeuds.push(paragraphe(
+    fort("Ce que ces chiffres ne disent pas."),
+    " Les factures ne contiennent aucun prix d'achat ni coût de production. Ce rapport mesure les ventes, pas la marge."
+  ));
+  noeuds.push(paragraphe(
+    fort("Volumes."),
+    " Les quantités au kilo et à la pièce restent séparées. Une unité manquante n'est déduite que des ventes identifiées du même légume."
+  ));
+  noeuds.push(paragraphe(
+    fort("Dates."),
+    " L'année et le mois viennent de la date d'émission, jamais du numéro de facture ni du dossier."
+  ));
+  document.getElementById("controle-corps").replaceChildren(...noeuds);
+}
+
+/* ---------- assemblage ---------- */
+function tout(){ tuiles(); graphMois(); graphLegumes(); graphClients(); graphSaison();
+                 tableauLegumes(); tableauClients(); }
+
+function init(){
+  document.getElementById("periode").textContent =
+    `${D.meta.libelle_periode} · ${D.controle.factures_integrees} factures · ${eur(D.meta.ca_total)} HT`;
+
+  if (D.meta.incompletes.length){
+    const derniere = D.meta.incompletes[D.meta.incompletes.length-1];
+    document.getElementById("avis").replaceChildren(el("p",{class:"avis"},
+      `Année ${D.meta.incompletes.join(", ")} incomplète : la dernière facture connue date du `,
+      `${derniereFacture(derniere)}. Les évolutions comparent les mêmes mois, mais les totaux annuels bruts ne sont pas comparables.`));
+  }
+
+  const f = document.getElementById("filtres");
+  const choix = [["tout","Toutes"], ...D.meta.annees.map(a=>[String(a),String(a)])];
+  choix.forEach(([v,t])=>{
+    const b = el("button",{type:"button","aria-pressed":String(v===annee)}, t);
+    b.addEventListener("click",()=>{
+      annee = v;
+      [...f.children].forEach(x=>x.setAttribute("aria-pressed", String(x===b)));
+      tout();
+    });
+    f.append(b);
+  });
+
+  document.querySelectorAll("#bascule-leg button").forEach(b=>{
+    b.addEventListener("click",()=>{
+      mesureLeg = b.dataset.mesure;
+      document.querySelectorAll("#bascule-leg button").forEach(x=>
+        x.setAttribute("aria-pressed", String(x===b)));
+      graphLegumes();
+    });
+  });
+
+  controle();
+  tout();
+  document.getElementById("pied").textContent =
+    "Rapport généré le "+D.meta.genere_le+" à partir des factures PDF. Aucune saisie manuelle.";
+}
+
+let minuteur;
+addEventListener("resize",()=>{clearTimeout(minuteur);minuteur=setTimeout(tout,180);});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",tout);
+init();
+</script>
+</body>
+</html>

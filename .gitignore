@@ -1,0 +1,36 @@
+# --- Données : rien de réel ne doit entrer dans ce dépôt ---------------------
+# Les factures sont des documents commerciaux nominatifs. Le dépôt ne contient
+# que le générateur de factures fictives ; ni PDF réel, ni base, ni export.
+Factures/
+factures/
+Rapport/
+rapport/
+exemples/factures/
+exemples/rapport/
+*.sqlite
+*.sqlite3
+ventes.csv
+arbitrage.csv
+Clients.csv
+Produits.csv
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# --- Exécutable Windows ------------------------------------------------------
+*.exe
+*.spec
+
+# --- Divers ------------------------------------------------------------------
+.DS_Store
+*.kate-swp
+.idea/
+.vscode/

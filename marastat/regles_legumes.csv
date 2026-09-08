@@ -1,0 +1,73 @@
+# Regles de classement des lignes de facture en legumes.
+#
+# Chaque ligne du PDF est classee en testant les motifs DANS L'ORDRE de ce
+# fichier : le premier motif qui correspond gagne. Les motifs les plus
+# specifiques doivent donc etre places avant les plus generaux
+# ("chou de bruxelles" avant "chou", "pomme de terre nouvelle" avant
+# "pomme de terre").
+#
+# Le motif est cherche dans le texte "reference + designation" de la ligne,
+# mis en minuscules et debarrasse de ses accents. C'est une expression
+# reguliere Python.
+#
+# Pour ajouter un produit : inserer une ligne au bon endroit, relancer.
+motif;legume;famille
+fleur *d?'?ail|^fleur$;Fleur d'ail;Aromates
+\bail\b|ail elephant;Ail;Ail
+basilic;Basilic;Aromates
+menthe;Menthe;Aromates
+aromat|persil|coriandre|ciboulette|^cantine ar$;Aromates;Aromates
+fenouil;Fenouil;Fenouil
+crapaudine;Betterave crapaudine;Betterave
+better.*botte|botte.*better;Betterave botte;Betterave
+better;Betterave;Betterave
+carotte *(nouvelle|botte)|carott.*nouvelle;Carotte nouvelle;Carotte
+carott;Carotte;Carotte
+celeri.*rave;Céleri rave;Céleri
+celeri;Céleri (non précisé);Céleri
+chou.?fleur|choufl;Chou-fleur;Choux
+chou.*bruxelles;Chou de Bruxelles;Choux
+chou.*rave|choux rav;Chou rave;Choux
+chou.*kale;Chou kale;Choux
+chou.*blanc;Chou blanc;Choux
+chou.*rouge;Chou rouge;Choux
+chou.*fris;Chou frisé;Choux
+chou.*liss;Chou lisse;Choux
+chou.*pomme;Chou pommé;Choux
+chou;Chou (non précisé);Choux
+concombre|conco;Concombre;Concombre
+courgette;Courgette;Courgette
+butternut|butter;Courge butternut;Courges
+musquee;Courge musquée;Courges
+courge.*delicat|delicata;Courge delicata;Courges
+courge;Courge (non précisée);Courges
+echalote|echalo|^cantine ec$;Échalote;Échalote
+epinard;Épinard;Épinard
+melon;Melon;Melon
+multifeuille|multife|melange de salade;Salade multifeuille;Salade
+navet;Navet;Navet
+oignon.*botte|botte.*oignon;Oignon botte;Oignon
+oignon.*jaune;Oignon jaune;Oignon
+oignon.*rouge;Oignon rouge;Oignon
+oignon.*rose;Oignon rose;Oignon
+oignon.*nouveau|oignons nouveaux;Oignon nouveau;Oignon
+oignon;Oignon (non précisé);Oignon
+patate|pdouce;Patate douce;Patate douce
+poireau;Poireau;Poireau
+mini po(?!tiron);Mini poivron;Poivron
+poivron;Poivron;Poivron
+potimarron;Potimarron;Courges
+grenaille;PDT grenaille;Pomme de terre
+pdt.*ferme|pdt fer|douar den;PDT chair ferme;Pomme de terre
+pdt.*tendre|pdt te(?!rr);PDT chair tendre;Pomme de terre
+pomme de terre.*nouvelle|pdterre.*nouvelle|pdt.*nouvelle;PDT nouvelle;Pomme de terre
+\bpdt\b|pdterre|pommes? de terre;Pomme de terre (non précisée);Pomme de terre
+radis.*noir|radis n;Radis noir;Radis
+radis.*bleu;Radis bleu;Radis
+radis.*(botte|rose|blanc|daikon)|radis b;Radis botte;Radis
+radis;Radis (non précisé);Radis
+rhubarbe|rhubar;Rhubarbe;Rhubarbe
+salade;Salade;Salade
+tomate.*cocktail;Tomate cocktail;Tomate
+tomate.*(ancienne|coeur de boeuf|marmande)|coeur de boeuf;Tomate ancienne;Tomate
+tomate;Tomate;Tomate
